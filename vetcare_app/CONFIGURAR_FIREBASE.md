@@ -149,7 +149,7 @@ static const FirebaseOptions android = FirebaseOptions(
   apiKey: 'TU-API-KEY-AQUI',                    // ← Copia de Firebase Console
   appId: '1:123456789:android:abcdef123456',   // ← Copia de Firebase Console
   messagingSenderId: '123456789',               // ← Copia de Firebase Console
-  projectId: 'tu-proyecto-id',                  // ← Copia de Firebase Console
+  projectId: 'vetcareap',                  // ← Copia de Firebase Console
   storageBucket: 'tu-proyecto.appspot.com',     // ← Copia de Firebase Console
 );
 ```

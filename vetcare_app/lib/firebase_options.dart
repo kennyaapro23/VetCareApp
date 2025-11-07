@@ -1,5 +1,5 @@
 // Este archivo contiene la configuración de Firebase para tu proyecto
-// Reemplaza estos valores con los de tu proyecto Firebase
+// Solo configuración móvil (Android/iOS) - NO se usa Web
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'
@@ -8,7 +8,9 @@ import 'package:flutter/foundation.dart'
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
-      return web;
+      throw UnsupportedError(
+        'Web no está configurado - Esta app solo funciona en móvil',
+      );
     }
     switch (defaultTargetPlatform) {
       case TargetPlatform.android:
@@ -16,59 +18,36 @@ class DefaultFirebaseOptions {
       case TargetPlatform.iOS:
         return ios;
       case TargetPlatform.macOS:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for macos - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       case TargetPlatform.linux:
         throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
+          'Esta app solo está configurada para Android/iOS',
         );
       default:
         throw UnsupportedError(
-          'DefaultFirebaseOptions are not supported for this platform.',
+          'Plataforma no soportada',
         );
     }
   }
 
-  // Configuración para Web
-  // Ve a: Firebase Console > Project Settings > General > Your apps > Web app
-  static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyDemoKey-Replace-With-Your-Real-Key',
-    appId: '1:123456789:web:abcdef123456',
-    messagingSenderId: '123456789',
-    projectId: 'vetcare-app',
-    authDomain: 'vetcare-app.firebaseapp.com',
-    storageBucket: 'vetcare-app.appspot.com',
-    measurementId: 'G-MEASUREMENT_ID',
-  );
-
-  // Configuración para Android
-  // Ve a: Firebase Console > Project Settings > General > Your apps > Android app
-  // O descarga google-services.json y usa FlutterFire CLI
+  // ✅ Configuración para Android (LISTA PARA USAR)
+  // Extraída automáticamente de google-services.json
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDemoKey-Replace-With-Your-Real-Android-Key',
-    appId: '1:123456789:android:abcdef123456',
-    messagingSenderId: '123456789',
-    projectId: 'vetcare-app',
-    storageBucket: 'vetcare-app.appspot.com',
+    apiKey: 'AIzaSyCUU5TVtktJzFMsClxpvrv2Nu2QgR5N_J0',
+    appId: '1:242642212663:android:3bd8d73e544eca24136cb2',
+    messagingSenderId: '242642212663',
+    projectId: 'vetcareap',
+    storageBucket: 'vetcareap.firebasestorage.app',
   );
 
-  // Configuración para iOS
-  // Ve a: Firebase Console > Project Settings > General > Your apps > iOS app
-  // O descarga GoogleService-Info.plist y usa FlutterFire CLI
+  // ⚠️ Configuración para iOS (Configurar si usas iPhone)
+  // Descarga GoogleService-Info.plist y colócalo en ios/Runner/
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyDemoKey-Replace-With-Your-Real-iOS-Key',
-    appId: '1:123456789:ios:abcdef123456',
-    messagingSenderId: '123456789',
-    projectId: 'vetcare-app',
-    storageBucket: 'vetcare-app.appspot.com',
+    apiKey: 'AIzaSy...', // Obtener de GoogleService-Info.plist
+    appId: '1:242642212663:ios:...', // Obtener de Firebase Console
+    messagingSenderId: '242642212663',
+    projectId: 'vetcareap',
+    storageBucket: 'vetcareap.firebasestorage.app',
     iosBundleId: 'com.example.vetcareApp',
   );
 }

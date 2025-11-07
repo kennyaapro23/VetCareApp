@@ -1,0 +1,64 @@
+🔌 CONFIGURACIÓN RÁPIDA PARA FLUTTER
+=====================================
+
+✅ SERVIDOR CORRIENDO: http://0.0.0.0:8000
+
+📱 URLS PARA FLUTTER
+====================
+
+1️⃣ ANDROID EMULATOR:
+   const String baseUrl = 'http://10.0.2.2:8000/api';
+
+2️⃣ DISPOSITIVO REAL (mismo WiFi):
+   const String baseUrl = 'http://172.20.76.28:8000/api';
+   
+   ⚠️ IMPORTANTE: Asegúrate de que tu dispositivo móvil esté 
+   conectado a la MISMA red WiFi que tu PC.
+
+3️⃣ iOS SIMULATOR:
+   const String baseUrl = 'http://localhost:8000/api';
+
+🧪 USUARIOS DE PRUEBA
+======================
+
+Admin:
+  Email: admin@veterinaria.com
+  Pass: password
+
+Veterinario:
+  Email: vet1@veterinaria.com
+  Pass: password
+
+Cliente:
+  Email: cliente1@veterinaria.com
+  Pass: password
+
+🔥 FIREBASE FCM
+================
+
+1. Crear proyecto en: https://console.firebase.google.com/
+2. Agregar app Android/iOS
+3. Descargar google-services.json o GoogleService-Info.plist
+4. Copiar Server Key de Firebase
+5. Agregar en Laravel .env:
+   FIREBASE_SERVER_KEY=tu_server_key_aqui
+
+📚 DOCUMENTACIÓN
+=================
+
+- Guía de conexión: CONEXION_FLUTTER.md
+- Filtros y búsquedas: FILTROS_GUIDE.md
+- Código de ejemplo: FLUTTER_CODE_EXAMPLES.md
+- API completa: API_DOCUMENTATION.md
+
+🎯 PRÓXIMOS PASOS
+==================
+
+1. ✅ Servidor corriendo
+2. 📱 Configurar baseUrl en Flutter según dispositivo
+3. 🔐 Implementar login con ApiService
+4. 🧪 Probar conexión
+5. 🔥 Configurar Firebase
+6. 🚀 Desarrollar pantallas
+
+¡Todo listo para empezar con Flutter! 🎉

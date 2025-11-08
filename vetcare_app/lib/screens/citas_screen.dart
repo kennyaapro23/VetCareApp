@@ -3,7 +3,9 @@ import 'package:provider/provider.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/models/appointment_model.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
+import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
+import 'calendar_appointment_screen.dart';
 
 class CitasScreen extends StatefulWidget {
   const CitasScreen({super.key});
@@ -30,36 +32,18 @@ class _CitasScreenState extends State<CitasScreen> {
       final service = AppointmentService(auth.api);
       final status = _filterStatus == 'todas' ? null : _filterStatus;
       final data = await service.getAppointments(status: status);
-      setState(() => _appointments = data);
+      if (mounted) {
+        setState(() {
+          _appointments = data;
+          _loading = false;
+        });
+      }
     } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-    } finally {
-      setState(() => _loading = false);
-    }
-  }
-
-  Future<void> _createAppointment() async {
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => const _CreateAppointmentDialog(),
-    );
-    if (result != null) {
-      setState(() => _loading = true);
-      try {
-        final auth = context.read<AuthProvider>();
-        final service = AppointmentService(auth.api);
-        await service.createAppointment(result);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita creada exitosamente'), backgroundColor: Colors.green),
-        );
-        _loadAppointments();
-      } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
-      } finally {
+      if (mounted) {
         setState(() => _loading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor),
+        );
       }
     }
   }
@@ -71,83 +55,108 @@ class _CitasScreenState extends State<CitasScreen> {
         title: const Text('Cancelar cita'),
         content: const Text('¿Estás seguro de cancelar esta cita?'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('No')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Sí, cancelar')),
+          TextButton(
+            onPressed: () => Navigator.pop(context, false),
+            child: const Text('No'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(context, true),
+            child: const Text('Sí, cancelar'),
+          ),
         ],
       ),
     );
+
     if (confirm == true) {
       try {
         final auth = context.read<AuthProvider>();
         final service = AppointmentService(auth.api);
         await service.cancelAppointment(id);
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Cita cancelada'), backgroundColor: Colors.orange),
-        );
-        _loadAppointments();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('Cita cancelada'),
+              backgroundColor: AppTheme.warningColor,
+            ),
+          );
+          _loadAppointments();
+        }
       } catch (e) {
-        if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Error: $e'), backgroundColor: AppTheme.errorColor),
+          );
+        }
       }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Mis Citas'),
-        actions: [
-          IconButton(onPressed: _loadAppointments, icon: const Icon(Icons.refresh)),
-        ],
-      ),
       body: Column(
         children: [
-          _buildFilters(),
+          _buildFilters(isDark),
           Expanded(
             child: _loading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
                 : _appointments.isEmpty
-                    ? const Center(child: Text('No hay citas'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _appointments.length,
-                        itemBuilder: (context, i) => _AppointmentCard(
-                          appointment: _appointments[i],
-                          onCancel: () => _cancelAppointment(_appointments[i].id),
+                    ? _buildEmptyState(isDark)
+                    : RefreshIndicator(
+                        onRefresh: _loadAppointments,
+                        color: AppTheme.primaryColor,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.all(16),
+                          itemCount: _appointments.length,
+                          itemBuilder: (context, i) => _AppointmentCard(
+                            appointment: _appointments[i],
+                            isDark: isDark,
+                            onCancel: () => _cancelAppointment(_appointments[i].id),
+                          ),
                         ),
                       ),
           ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createAppointment,
+        onPressed: () async {
+          await Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const CalendarAppointmentScreen(),
+            ),
+          );
+          _loadAppointments();
+        },
+        backgroundColor: AppTheme.primaryColor,
         icon: const Icon(Icons.add),
-        label: const Text('Nueva Cita'),
+        label: const Text('Agendar Cita'),
       ),
     );
   }
 
-  Widget _buildFilters() {
+  Widget _buildFilters(bool isDark) {
     return Container(
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.all(16),
+      color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: Row(
           children: [
-            _FilterChip('Todas', 'todas'),
-            _FilterChip('Pendiente', 'pendiente'),
-            _FilterChip('Confirmada', 'confirmada'),
-            _FilterChip('Atendida', 'atendida'),
-            _FilterChip('Cancelada', 'cancelada'),
+            _buildFilterChip('Todas', 'todas', isDark),
+            _buildFilterChip('Pendiente', 'pendiente', isDark),
+            _buildFilterChip('Confirmada', 'confirmada', isDark),
+            _buildFilterChip('Atendida', 'atendida', isDark),
+            _buildFilterChip('Cancelada', 'cancelada', isDark),
           ],
         ),
       ),
     );
   }
 
-  Widget _FilterChip(String label, String value) {
+  Widget _buildFilterChip(String label, String value, bool isDark) {
     final selected = _filterStatus == value;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -158,6 +167,37 @@ class _CitasScreenState extends State<CitasScreen> {
           setState(() => _filterStatus = value);
           _loadAppointments();
         },
+        selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
+        checkmarkColor: AppTheme.primaryColor,
+        labelStyle: TextStyle(
+          color: selected ? AppTheme.primaryColor : null,
+          fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyState(bool isDark) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(Icons.calendar_today_outlined, size: 80, color: AppTheme.textSecondary),
+          const SizedBox(height: 16),
+          Text(
+            _filterStatus == 'todas'
+                ? 'No tienes citas programadas'
+                : 'No hay citas con estado "$_filterStatus"',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            'Presiona el botón "+" para agendar una cita',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                ),
+          ),
+        ],
       ),
     );
   }
@@ -165,24 +205,36 @@ class _CitasScreenState extends State<CitasScreen> {
 
 class _AppointmentCard extends StatelessWidget {
   final AppointmentModel appointment;
+  final bool isDark;
   final VoidCallback onCancel;
 
-  const _AppointmentCard({required this.appointment, required this.onCancel});
+  const _AppointmentCard({
+    required this.appointment,
+    required this.isDark,
+    required this.onCancel,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    final dateStr = appointment.date != null ? DateFormat('dd/MM/yyyy HH:mm').format(appointment.date!) : 'Sin fecha';
+    final dateStr = appointment.date != null
+        ? DateFormat('dd/MM/yyyy HH:mm').format(appointment.date!)
+        : 'Sin fecha';
 
-    Color statusColor = Colors.grey;
-    if (appointment.status == 'pendiente') statusColor = Colors.orange;
-    if (appointment.status == 'confirmada') statusColor = Colors.blue;
-    if (appointment.status == 'atendida') statusColor = Colors.green;
-    if (appointment.status == 'cancelada') statusColor = Colors.red;
+    Color statusColor = AppTheme.textSecondary;
+    if (appointment.status == 'pendiente') statusColor = AppTheme.warningColor;
+    if (appointment.status == 'confirmada') statusColor = AppTheme.primaryColor;
+    if (appointment.status == 'atendida') statusColor = AppTheme.successColor;
+    if (appointment.status == 'cancelada') statusColor = AppTheme.errorColor;
 
-    return Card(
+    return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+        ),
+      ),
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -198,138 +250,55 @@ class _AppointmentCard extends StatelessWidget {
                   ),
                   child: Text(
                     appointment.status ?? 'Sin estado',
-                    style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
+                    ),
                   ),
                 ),
                 const Spacer(),
-                if (appointment.status == 'pendiente' || appointment.status == 'confirmada')
+                if (appointment.status == 'pendiente')
                   IconButton(
-                    icon: const Icon(Icons.cancel_outlined, color: Colors.red),
+                    icon: const Icon(Icons.cancel_outlined),
+                    color: AppTheme.errorColor,
                     onPressed: onCancel,
+                    tooltip: 'Cancelar cita',
                   ),
               ],
             ),
             const SizedBox(height: 12),
-            Text(appointment.reason ?? 'Sin motivo', style: theme.textTheme.titleMedium?.copyWith(fontWeight: FontWeight.bold)),
-            const SizedBox(height: 8),
             Row(
               children: [
-                const Icon(Icons.calendar_today, size: 16, color: Colors.grey),
+                Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
                 const SizedBox(width: 8),
-                Text(dateStr, style: theme.textTheme.bodyMedium),
+                Text(
+                  dateStr,
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
               ],
             ),
+            if (appointment.reason != null) ...[
+              const SizedBox(height: 8),
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Icon(Icons.notes, size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      appointment.reason!,
+                      style: TextStyle(
+                        color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
           ],
         ),
       ),
-    );
-  }
-}
-
-class _CreateAppointmentDialog extends StatefulWidget {
-  const _CreateAppointmentDialog();
-
-  @override
-  State<_CreateAppointmentDialog> createState() => _CreateAppointmentDialogState();
-}
-
-class _CreateAppointmentDialogState extends State<_CreateAppointmentDialog> {
-  final _formKey = GlobalKey<FormState>();
-  final _petIdC = TextEditingController();
-  final _vetIdC = TextEditingController();
-  final _reasonC = TextEditingController();
-  DateTime? _selectedDate;
-  TimeOfDay? _selectedTime;
-
-  @override
-  void dispose() {
-    _petIdC.dispose();
-    _vetIdC.dispose();
-    _reasonC.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate() async {
-    final date = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
-    );
-    if (date != null) setState(() => _selectedDate = date);
-  }
-
-  Future<void> _pickTime() async {
-    final time = await showTimePicker(context: context, initialTime: TimeOfDay.now());
-    if (time != null) setState(() => _selectedTime = time);
-  }
-
-  void _submit() {
-    if (!_formKey.currentState!.validate()) return;
-    if (_selectedDate == null || _selectedTime == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Selecciona fecha y hora')));
-      return;
-    }
-    final dateTime = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, _selectedTime!.hour, _selectedTime!.minute);
-    Navigator.pop(context, {
-      'mascota_id': _petIdC.text.trim(),
-      'veterinario_id': _vetIdC.text.trim(),
-      'motivo': _reasonC.text.trim(),
-      'fecha': dateTime.toIso8601String(),
-      'estado': 'pendiente',
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final dateStr = _selectedDate != null ? DateFormat('dd/MM/yyyy').format(_selectedDate!) : 'Seleccionar';
-    final timeStr = _selectedTime != null ? _selectedTime!.format(context) : 'Seleccionar';
-
-    return AlertDialog(
-      title: const Text('Nueva Cita'),
-      content: SingleChildScrollView(
-        child: Form(
-          key: _formKey,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              TextFormField(
-                controller: _petIdC,
-                decoration: const InputDecoration(labelText: 'ID Mascota'),
-                validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _vetIdC,
-                decoration: const InputDecoration(labelText: 'ID Veterinario'),
-                validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 12),
-              TextFormField(
-                controller: _reasonC,
-                decoration: const InputDecoration(labelText: 'Motivo'),
-                maxLines: 2,
-                validator: (v) => (v == null || v.isEmpty) ? 'Requerido' : null,
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.calendar_today),
-                title: Text(dateStr),
-                onTap: _pickDate,
-              ),
-              ListTile(
-                leading: const Icon(Icons.access_time),
-                title: Text(timeStr),
-                onTap: _pickTime,
-              ),
-            ],
-          ),
-        ),
-      ),
-      actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancelar')),
-        ElevatedButton(onPressed: _submit, child: const Text('Crear')),
-      ],
     );
   }
 }

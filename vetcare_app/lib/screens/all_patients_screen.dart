@@ -14,8 +14,8 @@ class AllPatientsScreen extends StatefulWidget {
 }
 
 class _AllPatientsScreenState extends State<AllPatientsScreen> {
-  List<PetModel> _patients = [];
-  List<PetModel> _filteredPatients = [];
+  List<PetModel> _pets = [];
+  List<PetModel> _filteredPets = [];
   bool _isLoading = true;
   final _searchController = TextEditingController();
   String _filterSpecies = 'todas';
@@ -23,8 +23,8 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
   @override
   void initState() {
     super.initState();
-    _loadPatients();
-    _searchController.addListener(_filterPatients);
+    _loadPets();
+    _searchController.addListener(_filterPets);
   }
 
   @override
@@ -33,18 +33,19 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
     super.dispose();
   }
 
-  Future<void> _loadPatients() async {
+  Future<void> _loadPets() async {
     setState(() => _isLoading = true);
     try {
       final auth = context.read<AuthProvider>();
       final service = PetService(auth.api);
-      final patients = await service.getPets();
+      final pets = await service.getPets();
       if (mounted) {
         setState(() {
-          _patients = patients;
-          _filteredPatients = patients;
+          _pets = pets;
+          _filteredPets = pets;
           _isLoading = false;
         });
+        _filterPets();
       }
     } catch (e) {
       if (mounted) {
@@ -56,15 +57,17 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
     }
   }
 
-  void _filterPatients() {
+  void _filterPets() {
     final query = _searchController.text.toLowerCase();
     setState(() {
-      _filteredPatients = _patients.where((pet) {
+      _filteredPets = _pets.where((pet) {
         final matchesSearch = pet.name.toLowerCase().contains(query) ||
-                              pet.species.toLowerCase().contains(query) ||
-                              pet.breed.toLowerCase().contains(query);
+            pet.species.toLowerCase().contains(query) ||
+            pet.breed.toLowerCase().contains(query);
+
         final matchesSpecies = _filterSpecies == 'todas' ||
-                               pet.species.toLowerCase().contains(_filterSpecies);
+            pet.species.toLowerCase().contains(_filterSpecies.toLowerCase());
+
         return matchesSearch && matchesSpecies;
       }).toList();
     });
@@ -75,81 +78,84 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      body: Column(
-        children: [
-          // Búsqueda y Filtros
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: isDark ? AppTheme.darkSurface : AppTheme.lightSurface,
-            child: Column(
-              children: [
-                TextField(
+      appBar: AppBar(
+        title: const Text('Pacientes'),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(120),
+          child: Column(
+            children: [
+              // Buscador
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+                child: TextField(
                   controller: _searchController,
                   decoration: InputDecoration(
-                    hintText: 'Buscar paciente...',
+                    hintText: 'Buscar por nombre, especie o raza...',
                     prefixIcon: const Icon(Icons.search),
                     suffixIcon: _searchController.text.isNotEmpty
                         ? IconButton(
                             icon: const Icon(Icons.clear),
                             onPressed: () {
                               _searchController.clear();
-                              _filterPatients();
+                              _filterPets();
                             },
                           )
                         : null,
+                    filled: true,
+                    fillColor: isDark ? AppTheme.darkCard : Colors.white,
                   ),
                 ),
-                const SizedBox(height: 12),
-                SingleChildScrollView(
+              ),
+              // Filtros por especie
+              SizedBox(
+                height: 50,
+                child: ListView(
                   scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: [
-                      _buildFilterChip('Todas', 'todas', isDark),
-                      _buildFilterChip('Perros', 'perro', isDark),
-                      _buildFilterChip('Gatos', 'gato', isDark),
-                    ],
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  children: [
+                    _buildSpeciesFilter('Todas', 'todas', isDark),
+                    _buildSpeciesFilter('Perros', 'perro', isDark),
+                    _buildSpeciesFilter('Gatos', 'gato', isDark),
+                    _buildSpeciesFilter('Otros', 'otros', isDark),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+          ),
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
+          : _filteredPets.isEmpty
+              ? _buildEmptyState(isDark)
+              : RefreshIndicator(
+                  onRefresh: _loadPets,
+                  color: AppTheme.primaryColor,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _filteredPets.length,
+                    itemBuilder: (context, index) {
+                      final pet = _filteredPets[index];
+                      return _PatientCard(
+                        pet: pet,
+                        isDark: isDark,
+                        onTap: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => PetDetailScreen(pet: pet),
+                            ),
+                          );
+                        },
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // Lista
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
-                : _filteredPatients.isEmpty
-                    ? _buildEmptyState(isDark)
-                    : RefreshIndicator(
-                        onRefresh: _loadPatients,
-                        color: AppTheme.primaryColor,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredPatients.length,
-                          itemBuilder: (context, index) {
-                            final patient = _filteredPatients[index];
-                            return _PatientCard(
-                              patient: patient,
-                              isDark: isDark,
-                              onTap: () {
-                                Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => PetDetailScreen(pet: patient),
-                                  ),
-                                );
-                              },
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
-      ),
     );
   }
 
-  Widget _buildFilterChip(String label, String value, bool isDark) {
+  Widget _buildSpeciesFilter(String label, String value, bool isDark) {
     final isSelected = _filterSpecies == value;
     return Padding(
       padding: const EdgeInsets.only(right: 8),
@@ -160,10 +166,14 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
           setState(() {
             _filterSpecies = value;
           });
-          _filterPatients();
+          _filterPets();
         },
         selectedColor: AppTheme.primaryColor.withValues(alpha: 0.2),
         checkmarkColor: AppTheme.primaryColor,
+        labelStyle: TextStyle(
+          color: isSelected ? AppTheme.primaryColor : null,
+          fontWeight: isSelected ? FontWeight.w600 : FontWeight.normal,
+        ),
       ),
     );
   }
@@ -175,7 +185,19 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
         children: [
           Icon(Icons.pets, size: 80, color: AppTheme.textSecondary),
           const SizedBox(height: 16),
-          Text('No hay pacientes', style: Theme.of(context).textTheme.titleMedium),
+          Text(
+            _pets.isEmpty ? 'No hay pacientes' : 'No se encontraron pacientes',
+            style: Theme.of(context).textTheme.titleMedium,
+          ),
+          const SizedBox(height: 8),
+          Text(
+            _pets.isEmpty
+                ? 'Aún no hay mascotas registradas'
+                : 'Intenta con otro término de búsqueda',
+            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                ),
+          ),
         ],
       ),
     );
@@ -183,12 +205,12 @@ class _AllPatientsScreenState extends State<AllPatientsScreen> {
 }
 
 class _PatientCard extends StatelessWidget {
-  final PetModel patient;
+  final PetModel pet;
   final bool isDark;
   final VoidCallback onTap;
 
   const _PatientCard({
-    required this.patient,
+    required this.pet,
     required this.isDark,
     required this.onTap,
   });
@@ -213,6 +235,7 @@ class _PatientCard extends StatelessWidget {
             padding: const EdgeInsets.all(16),
             child: Row(
               children: [
+                // Icono de mascota
                 Container(
                   width: 60,
                   height: 60,
@@ -220,36 +243,49 @@ class _PatientCard extends StatelessWidget {
                     color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Icon(Icons.pets, color: AppTheme.primaryColor, size: 30),
+                  child: Icon(
+                    pet.species.toLowerCase().contains('perro')
+                        ? Icons.pets
+                        : Icons.catching_pokemon,
+                    size: 30,
+                    color: AppTheme.primaryColor,
+                  ),
                 ),
                 const SizedBox(width: 16),
+                // Información
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(
-                        patient.name,
-                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        pet.name,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        '${patient.species} • ${patient.breed}',
+                        '${pet.species} • ${pet.breed}',
                         style: TextStyle(
                           fontSize: 14,
                           color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
                         ),
                       ),
-                      if (patient.age != null)
+                      if (pet.age != null) ...[
+                        const SizedBox(height: 4),
                         Text(
-                          '${patient.age} años',
+                          '${pet.age} años${pet.weight != null ? " • ${pet.weight} kg" : ""}',
                           style: TextStyle(
                             fontSize: 12,
                             color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
                           ),
                         ),
+                      ],
                     ],
                   ),
                 ),
+                // Flecha
                 Icon(
                   Icons.arrow_forward_ios,
                   size: 16,

@@ -2,11 +2,14 @@
 class AppConfig {
   // 🔧 CONFIGURACIÓN DE CONEXIÓN AL BACKEND
 
-  // Recomendación por defecto: usar localhost (127.0.0.1) + adb reverse para emulador
-  // 1) En Windows (cmd.exe) ejecuta: adb reverse tcp:8000 tcp:8000
-  // 2) Inicia Laravel: php artisan serve --host=0.0.0.0 --port=8000
-  // 3) Deja baseUrl como 127.0.0.1 (la app en el emulador se conectará al host)
+  // ✅ Usando localhost con adb reverse (MÉTODO CONFIABLE)
+  // ANTES de ejecutar la app, ejecuta este comando:
+  // C:\Users\kenny\AppData\Local\Android\sdk\platform-tools\adb.exe reverse tcp:8000 tcp:8000
+  // O usa el archivo start_dev.bat incluido en el proyecto
   static const String baseUrl = 'http://127.0.0.1:8000/api/';
+
+  // Nota: Se intentó usar IP local (192.168.1.45) pero no funcionó
+  // a pesar de configurar el firewall. El método adb reverse es más confiable.
 
   // Alternativas según tu entorno (descomenta la que corresponda):
   // - Android emulator (default Android emulator) suele aceptar 10.0.2.2

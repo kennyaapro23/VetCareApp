@@ -8,6 +8,7 @@ import 'citas_screen.dart';
 import 'servicios_screen.dart';
 import 'qr_screen.dart';
 import 'perfil_screen.dart';
+import 'all_patients_screen.dart';
 
 class VetHomeScreen extends StatefulWidget {
   const VetHomeScreen({super.key});
@@ -22,6 +23,7 @@ class _VetHomeScreenState extends State<VetHomeScreen> {
   final _screens = const [
     _VetDashboard(),
     CitasScreen(),
+    AllPatientsScreen(), // Nueva pantalla de pacientes
     ServiciosScreen(),
     QRScreen(),
     PerfilScreen(),
@@ -37,6 +39,7 @@ class _VetHomeScreenState extends State<VetHomeScreen> {
         destinations: const [
           NavigationDestination(icon: Icon(Icons.dashboard), label: 'Panel'),
           NavigationDestination(icon: Icon(Icons.calendar_today), label: 'Citas'),
+          NavigationDestination(icon: Icon(Icons.pets), label: 'Pacientes'),
           NavigationDestination(icon: Icon(Icons.medical_services), label: 'Servicios'),
           NavigationDestination(icon: Icon(Icons.qr_code), label: 'QR'),
           NavigationDestination(icon: Icon(Icons.person), label: 'Perfil'),

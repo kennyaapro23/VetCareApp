@@ -11,11 +11,6 @@ use Illuminate\Support\Facades\DB;
 
 class HistorialController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Listar historial médico con filtros
      */

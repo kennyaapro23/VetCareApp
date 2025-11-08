@@ -9,11 +9,6 @@ use Illuminate\Support\Facades\DB;
 
 class VeterinarioController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Listar veterinarios
      */

@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class NotificacionController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Listar notificaciones del usuario autenticado
      */

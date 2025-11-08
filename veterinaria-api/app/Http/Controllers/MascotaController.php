@@ -10,11 +10,6 @@ use Illuminate\Support\Facades\Storage;
 
 class MascotaController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Listar mascotas
      */

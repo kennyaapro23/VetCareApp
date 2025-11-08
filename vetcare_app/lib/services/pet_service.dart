@@ -7,11 +7,24 @@ class PetService {
   PetService(this._api);
 
   Future<List<PetModel>> getPets() async {
-    final resp = await _api.get<List<dynamic>>(
+    final resp = await _api.get<dynamic>(
       'mascotas',
-      (json) => (json is List) ? json : [],
+      (json) => json,
     );
-    return resp.map((e) => PetModel.fromJson(e)).toList();
+
+    // Manejar respuesta paginada de Laravel
+    List<dynamic> dataList;
+    if (resp is Map && resp.containsKey('data')) {
+      // Respuesta paginada: {"current_page": 1, "data": [...]}
+      dataList = (resp['data'] is List) ? resp['data'] : [];
+    } else if (resp is List) {
+      // Respuesta directa: [...]
+      dataList = resp;
+    } else {
+      dataList = [];
+    }
+
+    return dataList.map((e) => PetModel.fromJson(e)).toList();
   }
 
   Future<PetModel> getPet(String id) async {
@@ -47,4 +60,3 @@ class PetService {
     );
   }
 }
-

@@ -10,11 +10,6 @@ use Illuminate\Support\Str;
 
 class ClienteController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Listar clientes
      */

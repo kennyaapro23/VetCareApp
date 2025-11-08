@@ -5,9 +5,11 @@ class PetModel {
   final String name;
   final String species;
   final String breed;
+  final String? sexo; // Sexo de la mascota
   final int? age;
   final double? weight;
-  final List<dynamic> medicalHistory; // items pueden ser Map o String dependiendo del backend
+  final List<dynamic> medicalHistory;
+  final String? qrCode; // ✅ Código QR único por mascota
 
   PetModel({
     required this.id,
@@ -15,9 +17,11 @@ class PetModel {
     required this.name,
     required this.species,
     required this.breed,
+    this.sexo,
     this.age,
     this.weight,
     this.medicalHistory = const [],
+    this.qrCode, // ✅ Opcional, se genera si no existe
   });
 
   factory PetModel.fromJson(dynamic json) {
@@ -30,9 +34,11 @@ class PetModel {
       name: (map['nombre'] ?? map['name'] ?? '').toString(),
       species: (map['especie'] ?? map['species'] ?? '').toString(),
       breed: (map['raza'] ?? map['breed'] ?? '').toString(),
+      sexo: map['sexo']?.toString(),
       age: map['edad'] != null ? int.tryParse(map['edad'].toString()) : null,
       weight: map['peso'] != null ? double.tryParse(map['peso'].toString()) : null,
       medicalHistory: history,
+      qrCode: map['qr_code']?.toString() ?? map['codigo_qr']?.toString(), // ✅ QR desde backend
     );
   }
 
@@ -42,9 +48,13 @@ class PetModel {
         'nombre': name,
         'especie': species,
         'raza': breed,
+        if (sexo != null) 'sexo': sexo,
         'edad': age,
         'peso': weight,
         'historial_medico': medicalHistory,
+        'qr_code': qrCode, // ✅ Enviar QR al backend
       };
-}
 
+  // ✅ Generar código QR único basado en el ID de la mascota
+  String get uniqueQRCode => qrCode ?? 'VETCARE_PET_$id';
+}

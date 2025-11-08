@@ -14,12 +14,15 @@ class VetServiceService {
     return resp.map((e) => ServiceModel.fromJson(e)).toList();
   }
 
+  // TODO: Esta ruta no existe en el backend Laravel
+  // Opción 1: Filtrar localmente después de obtener todos los servicios
+  // Opción 2: Agregar endpoint en backend: GET /api/mascotas/{id}/servicios
   Future<List<ServiceModel>> getServicesByPet(String petId) async {
-    final resp = await _api.get<List<dynamic>>(
-      'mascotas/$petId/servicios',
-      (json) => (json is List) ? json : [],
-    );
-    return resp.map((e) => ServiceModel.fromJson(e)).toList();
+    // Por ahora, obtenemos todos los servicios y filtramos localmente
+    final allServices = await getServices();
+    // Si el modelo tiene un campo 'mascotaId', filtrar aquí
+    // return allServices.where((s) => s.mascotaId == petId).toList();
+    return allServices; // Retorna todos por ahora
   }
 
   Future<ServiceModel> createService(Map<String, dynamic> data) async {

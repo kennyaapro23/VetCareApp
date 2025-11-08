@@ -20,6 +20,11 @@ class Mascota extends Model
         'color',
         'chip_id',
         'foto_url',
+        'qr_code',
+        'alergias',
+        'condiciones_medicas',
+        'tipo_sangre',
+        'microchip',
     ];
 
     protected $casts = [
@@ -34,7 +39,26 @@ class Mascota extends Model
             if (empty($model->public_id)) {
                 $model->public_id = (string) Str::uuid();
             }
+            
+            // ✅ Generar QR automáticamente al crear
+            if (empty($model->qr_code)) {
+                $model->qr_code = 'VETCARE_PET_' . Str::uuid();
+            }
         });
+    }
+
+    // ✅ Método para regenerar QR si es necesario
+    public function regenerarQR()
+    {
+        $this->qr_code = 'VETCARE_PET_' . Str::uuid();
+        $this->save();
+        return $this->qr_code;
+    }
+
+    // ✅ Scope para buscar por QR
+    public function scopePorQR($query, $qrCode)
+    {
+        return $query->where('qr_code', $qrCode);
     }
 
     public function cliente()

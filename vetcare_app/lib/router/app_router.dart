@@ -23,19 +23,28 @@ class AppRouter {
         redirect: (context, state) {
           final isLoading = authProvider.isLoading;
           final user = authProvider.user;
-          final isLoggingIn = state.matchedLocation == '/login' ||
-                             state.matchedLocation == '/register' ||
-                             state.matchedLocation == '/splash';
+          final location = state.matchedLocation;
 
-          if (isLoading && state.matchedLocation != '/splash') {
-            return '/splash';
+          debugPrint('🔀 Router redirect: location=$location, isLoading=$isLoading, user=${user?.email}');
+
+          // Si está cargando, mostrar splash
+          if (isLoading) {
+            return location == '/splash' ? null : '/splash';
           }
 
-          if (user == null && !isLoggingIn) {
+          // Si terminó de cargar y está en splash, redirigir según estado
+          if (location == '/splash') {
+            return user != null ? '/home' : '/login';
+          }
+
+          // Si no hay usuario y no está en pantallas públicas, ir a login
+          final isPublicRoute = location == '/login' || location == '/register';
+          if (user == null && !isPublicRoute) {
             return '/login';
           }
 
-          if (user != null && isLoggingIn) {
+          // Si hay usuario y está en pantallas públicas, ir a home
+          if (user != null && isPublicRoute) {
             return '/home';
           }
 

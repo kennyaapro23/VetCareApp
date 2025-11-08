@@ -9,11 +9,11 @@ return new class extends Migration
     public function up()
     {
         Schema::table('clientes', function (Blueprint $table) {
-            $table->uuid('public_id')->unique()->after('id');
+            $table->uuid('public_id')->unique()->nullable()->after('id');
         });
 
         Schema::table('mascotas', function (Blueprint $table) {
-            $table->uuid('public_id')->unique()->after('id');
+            $table->uuid('public_id')->unique()->nullable()->after('id');
         });
     }
 

@@ -15,6 +15,12 @@ return Application::configure(basePath: dirname(__DIR__))
         $middleware->alias([
             'firebase.auth' => \App\Http\Middleware\FirebaseAuthMiddleware::class,
         ]);
+        
+        // Configuración de CORS para permitir peticiones desde Flutter/móvil
+        $middleware->api(prepend: [
+            \Illuminate\Http\Middleware\HandleCors::class,
+            \App\Http\Middleware\LogRequests::class,
+        ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         //

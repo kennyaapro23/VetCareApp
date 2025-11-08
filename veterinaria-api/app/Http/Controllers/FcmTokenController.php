@@ -8,11 +8,6 @@ use Illuminate\Support\Facades\DB;
 
 class FcmTokenController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     /**
      * Guardar o actualizar FCM token del dispositivo
      */

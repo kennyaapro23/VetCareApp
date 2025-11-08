@@ -2,7 +2,9 @@ import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:vetcare_app/config/app_config.dart';
 
 class ApiException implements Exception {
   final int? statusCode;
@@ -20,14 +22,13 @@ class ApiService {
   final Duration timeout;
   final int maxRetries;
 
-  ApiService({String? baseUrl, this.timeout = const Duration(seconds: 10), this.maxRetries = 3})
-      : baseUrl = baseUrl ?? _defaultBaseUrl();
-
-  static String _defaultBaseUrl() {
-    try {
-      if (Platform.isAndroid) return 'http://10.0.2.2:8000/api/';
-    } catch (_) {}
-    return 'http://localhost:8000/api/';
+  ApiService({
+    String? baseUrl,
+    this.timeout = const Duration(seconds: 30),
+    this.maxRetries = 3,
+  }) : baseUrl = baseUrl ?? AppConfig.baseUrl {
+    // Log la URL base para debugging de conectividad
+    debugPrint('🔗 ApiService.baseUrl = ${this.baseUrl}');
   }
 
   void setToken(String token) => _token = token;
@@ -36,7 +37,12 @@ class ApiService {
   Map<String, String> _headers({bool jsonContent = true}) {
     final headers = <String, String>{'Accept': 'application/json'};
     if (jsonContent) headers['Content-Type'] = 'application/json';
-    if (_token != null) headers['Authorization'] = 'Bearer $_token';
+    if (_token != null) {
+      headers['Authorization'] = 'Bearer $_token';
+      debugPrint('🔑 Token incluido en headers: ${_token!.substring(0, 20)}...');
+    } else {
+      debugPrint('⚠️ NO hay token configurado en headers');
+    }
     return headers;
   }
 
@@ -50,23 +56,33 @@ class ApiService {
 
   Future<T> get<T>(String path, T Function(dynamic json) fromJson, {Map<String, String>? queryParameters}) async {
     final uri = _uri(path, queryParameters);
+    debugPrint('🌐 GET ${uri.toString()}');
     return _retryRequest<T>(() => http.get(uri, headers: _headers(jsonContent: false)).timeout(timeout), fromJson);
   }
 
   Future<T> post<T>(String path, dynamic body, T Function(dynamic json) fromJson, {Map<String, String>? queryParameters}) async {
     final uri = _uri(path, queryParameters);
     final payload = jsonEncode(body);
+
+    // Log de debug
+    debugPrint('🌐 POST ${uri.toString()}');
+    debugPrint('📤 Headers: ${_headers()}');
+    debugPrint('📦 Body: $payload');
+
     return _retryRequest<T>(() => http.post(uri, headers: _headers(), body: payload).timeout(timeout), fromJson);
   }
 
   Future<T> put<T>(String path, dynamic body, T Function(dynamic json) fromJson, {Map<String, String>? queryParameters}) async {
     final uri = _uri(path, queryParameters);
     final payload = jsonEncode(body);
+    debugPrint('🌐 PUT ${uri.toString()}');
+    debugPrint('📦 Body: $payload');
     return _retryRequest<T>(() => http.put(uri, headers: _headers(), body: payload).timeout(timeout), fromJson);
   }
 
   Future<T> delete<T>(String path, T Function(dynamic json) fromJson, {Map<String, String>? queryParameters}) async {
     final uri = _uri(path, queryParameters);
+    debugPrint('🌐 DELETE ${uri.toString()}');
     return _retryRequest<T>(() => http.delete(uri, headers: _headers(jsonContent: false)).timeout(timeout), fromJson);
   }
 
@@ -75,6 +91,10 @@ class ApiService {
     while (true) {
       try {
         final res = await requestFn();
+
+        // Log de respuesta
+        debugPrint('📨 Response status: ${res.statusCode}');
+        debugPrint('📨 Response body: ${res.body}');
 
         if (res.statusCode >= 200 && res.statusCode < 300) {
           if (res.body.isEmpty) return fromJson(null);
@@ -93,6 +113,8 @@ class ApiService {
           final decoded = jsonDecode(res.body);
           if (decoded is Map && decoded.containsKey('message')) {
             message = decoded['message'].toString();
+          } else if (decoded is Map && decoded.containsKey('error')) {
+            message = decoded['error'].toString();
           } else {
             message = res.body;
           }
@@ -104,26 +126,32 @@ class ApiService {
         if (res.statusCode >= 500 && attempt < maxRetries - 1) {
           attempt++;
           final backoff = Duration(milliseconds: 500 * (1 << attempt));
+          debugPrint('⏳ Reintentando en ${backoff.inMilliseconds}ms (intento $attempt)');
           await Future.delayed(backoff);
           continue;
         }
 
         throw ApiException(message.isNotEmpty ? message : 'Error HTTP ${res.statusCode}', statusCode: res.statusCode);
       } on SocketException catch (e) {
+        debugPrint('❌ SocketException: ${e.message}');
+        debugPrint('❌ Dirección: ${e.address?.host}:${e.port}');
+        debugPrint('❌ Asegúrate de que el servidor Laravel esté corriendo en http://localhost:8000');
         attempt++;
         if (attempt >= maxRetries) {
-          throw ApiException('Error de red: ${e.message}');
+          throw ApiException('Error de conexión: No se pudo conectar al servidor. Verifica que Laravel esté corriendo en http://localhost:8000');
         }
         await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
         continue;
       } on TimeoutException catch (e) {
+        debugPrint('⏱️ TimeoutException: $e');
         attempt++;
         if (attempt >= maxRetries) {
-          throw ApiException('Timeout: ${e.message}');
+          throw ApiException('Timeout: El servidor no respondió a tiempo');
         }
         await Future.delayed(Duration(milliseconds: 500 * (1 << attempt)));
         continue;
       } catch (e) {
+        debugPrint('❌ Error inesperado: $e');
         // errores inesperados
         rethrow;
       }

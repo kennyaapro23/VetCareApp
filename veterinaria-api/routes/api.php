@@ -15,9 +15,25 @@ use App\Http\Controllers\FcmTokenController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 
+// Endpoint de prueba (público) para verificar conectividad
+Route::get('/health', function () {
+    return response()->json([
+        'status' => 'ok',
+        'message' => 'API Veterinaria funcionando correctamente',
+        'timestamp' => now()->toDateTimeString(),
+        'version' => '1.0.0',
+    ]);
+});
+
 Route::get('/user', function (Request $request) {
     return $request->user();
 })->middleware('auth:sanctum');
+
+// 🔍 QR Code routes (públicas para emergencias)
+Route::prefix('qr')->group(function () {
+    // Buscar información por QR (acceso público para emergencias)
+    Route::get('/lookup/{qrCode}', [QRController::class, 'lookup'])->name('api.qr.lookup');
+});
 
 // Authentication routes (Laravel Sanctum - tradicional)
 Route::post('/auth/register', [AuthController::class, 'register']);
@@ -36,11 +52,26 @@ Route::prefix('firebase')->group(function () {
     });
 });
 
-// QR Code routes (públicas para lectura)
-Route::get('/qr/lookup/{token}', [QRController::class, 'lookup'])->name('api.qr.lookup');
-
 // Rutas protegidas con Sanctum
 Route::middleware('auth:sanctum')->group(function () {
+    
+    // 📱 QR Code routes (protegidas)
+    Route::prefix('qr')->group(function () {
+        // Registrar escaneo
+        Route::post('/scan-log', [QRController::class, 'logScan']);
+        
+        // Historial de escaneos
+        Route::get('/scan-history/{qrCode}', [QRController::class, 'scanHistory']);
+        
+        // Estadísticas de escaneos
+        Route::get('/scan-stats/{mascotaId}', [QRController::class, 'scanStats']);
+    });
+    
+    // Generar QR para mascota
+    Route::get('/mascotas/{id}/qr', [QRController::class, 'generateMascotaQR']);
+    
+    // Generar QR para cliente
+    Route::get('/clientes/{id}/qr', [QRController::class, 'generateClienteQR']);
     
     // FCM Tokens (Firebase Cloud Messaging)        x
     Route::post('/fcm-token', [FcmTokenController::class, 'store']);
@@ -86,8 +117,4 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::apiResource('facturas', FacturaController::class);
     Route::get('/facturas-estadisticas', [FacturaController::class, 'getEstadisticas']);
     Route::get('/generar-numero-factura', [FacturaController::class, 'generateNumeroFactura']);
-    
-    // Generar QR Codes
-    Route::get('/mascotas/{id}/qr', [QRController::class, 'generateMascotaQR']);
-    Route::get('/clientes/{id}/qr', [QRController::class, 'generateClienteQR']);
 });

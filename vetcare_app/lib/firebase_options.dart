@@ -1,5 +1,4 @@
-// Este archivo contiene la configuración de Firebase para tu proyecto
-// Solo configuración móvil (Android/iOS) - NO se usa Web
+
 
 import 'package:firebase_core/firebase_core.dart' show FirebaseOptions;
 import 'package:flutter/foundation.dart'

@@ -12,11 +12,6 @@ use Carbon\Carbon;
 
 class CitaController extends Controller
 {
-    public function __construct()
-    {
-        $this->middleware('auth:sanctum');
-    }
-
     public function index(Request $request)
     {
         $query = Cita::with(['cliente', 'mascota', 'veterinario', 'servicios']);

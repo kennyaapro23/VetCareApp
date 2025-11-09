@@ -31,6 +31,9 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      setState(() {}); // Rebuild para actualizar FAB cuando cambia de tab
+    });
     _loadData();
   }
 
@@ -45,16 +48,25 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
     try {
       final auth = context.read<AuthProvider>();
 
+      debugPrint('🐾 Cargando datos para mascota: ${widget.pet.name} (ID: ${widget.pet.id})');
+
       // Cargar historial médico
       final historialService = HistorialMedicoService(auth.api);
       final historial = await historialService.getHistorial(
         mascotaId: int.tryParse(widget.pet.id),
       );
 
+      debugPrint('📋 Historiales cargados: ${historial.length}');
+      for (var h in historial) {
+        debugPrint('   - ID: ${h.id}, Tipo: ${h.tipo}, Servicios: ${h.servicios.length}, Total: \$${h.totalServicios}');
+      }
+
       // Cargar citas
       final citasService = AppointmentService(auth.api);
       final todasCitas = await citasService.getAppointments();
       final citasPet = todasCitas.where((c) => c.petId == widget.pet.id).toList();
+
+      debugPrint('📅 Citas encontradas: ${citasPet.length}');
 
       if (mounted) {
         setState(() {
@@ -64,6 +76,7 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
         });
       }
     } catch (e) {
+      debugPrint('❌ Error cargando datos: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -196,26 +209,30 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
           _buildCitasTab(isDark),
         ],
       ),
-      floatingActionButton: isVet && _tabController.index == 1
-          ? FloatingActionButton.extended(
-              onPressed: () async {
-                // Navegar a crear historial médico
-                final result = await Navigator.push<bool>(
-                  context,
-                  MaterialPageRoute(
-                    builder: (_) => CreateMedicalRecordScreen(pet: widget.pet),
-                  ),
-                );
-                // Si se creó exitosamente, recargar datos
-                if (result == true) {
-                  _loadData();
-                }
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Nuevo Historial'),
-              backgroundColor: AppTheme.primaryColor,
-            )
-          : null,
+      floatingActionButton: () {
+        final showFab = isVet && _tabController.index == 1;
+        debugPrint('🔘 FAB: isVet=$isVet, tabIndex=${_tabController.index}, showFab=$showFab');
+        if (!showFab) return null;
+        
+        return FloatingActionButton.extended(
+          onPressed: () async {
+            // Navegar a crear historial médico
+            final result = await Navigator.push<bool>(
+              context,
+              MaterialPageRoute(
+                builder: (_) => CreateMedicalRecordScreen(pet: widget.pet),
+              ),
+            );
+            // Si se creó exitosamente, recargar datos
+            if (result == true) {
+              _loadData();
+            }
+          },
+          icon: const Icon(Icons.add),
+          label: const Text('Nuevo Historial'),
+          backgroundColor: AppTheme.primaryColor,
+        );
+      }(),
     );
   }
 

@@ -12,6 +12,9 @@ import 'package:vetcare_app/screens/qr_screen.dart';
 import 'package:vetcare_app/screens/notificaciones_screen.dart';
 import 'package:vetcare_app/screens/perfil_screen.dart';
 import 'package:vetcare_app/screens/feed_screen.dart';
+import 'package:vetcare_app/screens/pet_detail_screen.dart';
+import 'package:vetcare_app/services/pet_service.dart';
+import 'package:provider/provider.dart';
 
 class AppRouter {
   final AuthProvider authProvider;
@@ -132,6 +135,17 @@ class AppRouter {
               const PerfilScreen(),
             ),
           ),
+          GoRoute(
+            path: '/pet-detail/:petId',
+            pageBuilder: (context, state) {
+              final petId = state.pathParameters['petId']!;
+              return _buildPageWithSlideTransition(
+                context,
+                state,
+                _PetDetailLoader(petId: petId),
+              );
+            },
+          ),
         ],
       );
 
@@ -249,6 +263,98 @@ class _SplashScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+}
+
+// Widget para cargar pet detail desde ID
+class _PetDetailLoader extends StatelessWidget {
+  final String petId;
+
+  const _PetDetailLoader({required this.petId});
+
+  @override
+  Widget build(BuildContext context) {
+    return FutureBuilder(
+      future: _loadPet(context),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Scaffold(
+            body: Center(child: CircularProgressIndicator()),
+          );
+        }
+
+        if (snapshot.hasError) {
+          final errorMsg = snapshot.error.toString();
+          final isSqlError = errorMsg.contains('SQLSTATE') || errorMsg.contains('relacionado_type');
+          
+          return Scaffold(
+            appBar: AppBar(title: const Text('Error')),
+            body: Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(Icons.error_outline, size: 64, color: Colors.red),
+                    const SizedBox(height: 16),
+                    Text(
+                      isSqlError 
+                        ? 'Error de base de datos en el servidor' 
+                        : 'Error al cargar mascota',
+                      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 12),
+                    if (isSqlError) ...[
+                      const Text(
+                        'La columna "relacionado_type" no existe en la tabla "archivos".',
+                        style: TextStyle(fontSize: 14),
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Por favor, contacta al administrador del sistema.',
+                        style: TextStyle(fontSize: 12, fontStyle: FontStyle.italic),
+                        textAlign: TextAlign.center,
+                      ),
+                    ] else ...[
+                      Text(
+                        errorMsg.length > 200 ? '${errorMsg.substring(0, 200)}...' : errorMsg,
+                        style: const TextStyle(fontSize: 12),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                    const SizedBox(height: 24),
+                    ElevatedButton.icon(
+                      onPressed: () => Navigator.of(context).pop(),
+                      icon: const Icon(Icons.arrow_back),
+                      label: const Text('Volver'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          );
+        }
+
+        if (!snapshot.hasData) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('No encontrado')),
+            body: const Center(
+              child: Text('Mascota no encontrada'),
+            ),
+          );
+        }
+
+        return PetDetailScreen(pet: snapshot.data!);
+      },
+    );
+  }
+
+  Future<dynamic> _loadPet(BuildContext context) async {
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final petService = PetService(auth.api);
+    return await petService.getPet(petId);
   }
 }
 

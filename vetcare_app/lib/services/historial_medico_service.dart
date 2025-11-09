@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:vetcare_app/models/historial_medico.dart';
 import 'package:vetcare_app/services/api_service.dart';
 
@@ -18,12 +19,36 @@ class HistorialMedicoService {
     if (facturado != null) params['facturado'] = facturado.toString();
     if (clienteId != null) params['cliente_id'] = clienteId.toString();
 
-    final resp = await _api.get<List<dynamic>>(
+    debugPrint('🌐 GET historial-medico con params: $params');
+
+    final resp = await _api.get<dynamic>(
       'historial-medico',
-      (json) => (json is List) ? json : [],
+      (json) => json,
       queryParameters: params.isNotEmpty ? params : null,
     );
-    return resp.map((e) => HistorialMedico.fromJson(e as Map<String, dynamic>)).toList();
+
+    debugPrint('📨 Respuesta historial raw: ${resp.runtimeType}');
+
+    // Manejar respuesta paginada de Laravel
+    List<dynamic> dataList;
+    if (resp is Map && resp.containsKey('data')) {
+      // Respuesta paginada: {"current_page": 1, "data": [...]}
+      dataList = (resp['data'] is List) ? resp['data'] : [];
+      debugPrint('📨 Respuesta paginada detectada: ${dataList.length} registros');
+    } else if (resp is List) {
+      // Respuesta directa: [...]
+      dataList = resp;
+      debugPrint('📨 Respuesta directa detectada: ${dataList.length} registros');
+    } else {
+      dataList = [];
+      debugPrint('⚠️ Respuesta no reconocida');
+    }
+
+    if (dataList.isNotEmpty) {
+      debugPrint('📨 Primer registro: ${dataList.first}');
+    }
+
+    return dataList.map((e) => HistorialMedico.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   /// Obtener historiales sin facturar de un cliente ⭐ NUEVO

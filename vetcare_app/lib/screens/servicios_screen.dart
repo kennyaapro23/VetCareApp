@@ -2,8 +2,12 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/models/service_model.dart';
+import 'package:vetcare_app/models/appointment_model.dart';
 import 'package:vetcare_app/services/vet_service_service.dart';
+import 'package:vetcare_app/services/appointment_service.dart';
+import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 
 class ServiciosScreen extends StatefulWidget {
   const ServiciosScreen({super.key});
@@ -12,28 +16,55 @@ class ServiciosScreen extends StatefulWidget {
   State<ServiciosScreen> createState() => _ServiciosScreenState();
 }
 
-class _ServiciosScreenState extends State<ServiciosScreen> {
+class _ServiciosScreenState extends State<ServiciosScreen> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
+  
   List<ServiceModel> _services = [];
-  bool _loading = false;
+  List<AppointmentModel> _appointments = [];
+  bool _loadingServices = false;
+  bool _loadingAppointments = false;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadServices();
+    _loadAppointments();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadServices() async {
-    setState(() => _loading = true);
+    setState(() => _loadingServices = true);
     try {
       final auth = context.read<AuthProvider>();
       final service = VetServiceService(auth.api);
       final data = await service.getServices();
-      setState(() => _services = data);
+      if (mounted) setState(() => _services = data);
     } catch (e) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando servicios: $e')));
     } finally {
-      setState(() => _loading = false);
+      if (mounted) setState(() => _loadingServices = false);
+    }
+  }
+
+  Future<void> _loadAppointments() async {
+    setState(() => _loadingAppointments = true);
+    try {
+      final auth = context.read<AuthProvider>();
+      final service = AppointmentService(auth.api);
+      final data = await service.getAppointments();
+      if (mounted) setState(() => _appointments = data);
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error cargando citas: $e')));
+    } finally {
+      if (mounted) setState(() => _loadingAppointments = false);
     }
   }
 
@@ -43,7 +74,7 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
       builder: (context) => const _CreateServiceDialog(),
     );
     if (result != null) {
-      setState(() => _loading = true);
+      setState(() => _loadingServices = true);
       try {
         final auth = context.read<AuthProvider>();
         final service = VetServiceService(auth.api);
@@ -57,7 +88,7 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
         if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Error: $e')));
       } finally {
-        setState(() => _loading = false);
+        if (mounted) setState(() => _loadingServices = false);
       }
     }
   }
@@ -66,24 +97,86 @@ class _ServiciosScreenState extends State<ServiciosScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Servicios Veterinarios'),
+        title: const Text('Servicios y Citas'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(icon: Icon(Icons.medical_services), text: 'Servicios'),
+            Tab(icon: Icon(Icons.calendar_today), text: 'Mis Citas'),
+          ],
+        ),
         actions: [
-          IconButton(onPressed: _loadServices, icon: const Icon(Icons.refresh)),
+          IconButton(
+            onPressed: () {
+              if (_tabController.index == 0) {
+                _loadServices();
+              } else {
+                _loadAppointments();
+              }
+            },
+            icon: const Icon(Icons.refresh),
+          ),
         ],
       ),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : _services.isEmpty
-              ? const Center(child: Text('No hay servicios registrados'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(12),
-                  itemCount: _services.length,
-                  itemBuilder: (context, i) => _ServiceCard(service: _services[i]),
-                ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: _createService,
-        icon: const Icon(Icons.add),
-        label: const Text('Nuevo Servicio'),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Tab 1: Servicios Disponibles
+          _buildServicesTab(),
+          // Tab 2: Mis Citas
+          _buildAppointmentsTab(),
+        ],
+      ),
+      floatingActionButton: _tabController.index == 0
+          ? FloatingActionButton.extended(
+              onPressed: _createService,
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo Servicio'),
+            )
+          : null,
+    );
+  }
+
+  Widget _buildServicesTab() {
+    if (_loadingServices) {
+      return const Center(child: CircularProgressIndicator());
+    }
+    if (_services.isEmpty) {
+      return const Center(child: Text('No hay servicios registrados'));
+    }
+    return RefreshIndicator(
+      onRefresh: _loadServices,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _services.length,
+        itemBuilder: (context, i) => _ServiceCard(service: _services[i]),
+      ),
+    );
+  }
+
+  Widget _buildAppointmentsTab() {
+    if (_loadingAppointments) {
+      return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
+    }
+    if (_appointments.isEmpty) {
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Icons.calendar_today_outlined, size: 80, color: AppTheme.textSecondary),
+            SizedBox(height: 16),
+            Text('No tienes citas programadas', style: TextStyle(fontSize: 16)),
+          ],
+        ),
+      );
+    }
+    return RefreshIndicator(
+      onRefresh: _loadAppointments,
+      color: AppTheme.primaryColor,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(12),
+        itemCount: _appointments.length,
+        itemBuilder: (context, i) => _AppointmentCard(appointment: _appointments[i]),
       ),
     );
   }
@@ -161,6 +254,131 @@ class _ServiceCard extends StatelessWidget {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _AppointmentCard extends StatelessWidget {
+  final AppointmentModel appointment;
+
+  const _AppointmentCard({required this.appointment});
+
+  void _navigateToPetProfile(BuildContext context) {
+    if (appointment.petId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se puede abrir el perfil: ID de mascota no disponible'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    // Navegar al perfil de la mascota usando GoRouter
+    context.go('/pet-detail/${appointment.petId}');
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final isDark = theme.brightness == Brightness.dark;
+    final dateStr = appointment.date != null
+        ? DateFormat('dd/MM/yyyy HH:mm').format(appointment.date!)
+        : 'Sin fecha';
+
+    Color statusColor = AppTheme.textSecondary;
+    if (appointment.status == 'pendiente') statusColor = AppTheme.warningColor;
+    if (appointment.status == 'confirmada') statusColor = AppTheme.primaryColor;
+    if (appointment.status == 'atendida') statusColor = AppTheme.successColor;
+    if (appointment.status == 'cancelada') statusColor = AppTheme.errorColor;
+
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+      child: InkWell(
+        onTap: () => _navigateToPetProfile(context),
+        borderRadius: BorderRadius.circular(12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: isDark ? AppTheme.darkCard : Colors.white,
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: statusColor.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: Text(
+                        appointment.status ?? 'Sin estado',
+                        style: TextStyle(
+                          color: statusColor,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 12),
+                Row(
+                  children: [
+                    const Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
+                    const SizedBox(width: 8),
+                    Text(
+                      dateStr,
+                      style: const TextStyle(fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+                if (appointment.reason != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      const Icon(Icons.notes, size: 16, color: AppTheme.textSecondary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          appointment.reason!,
+                          style: TextStyle(
+                            color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    const Icon(Icons.touch_app, size: 14, color: AppTheme.primaryColor),
+                    const SizedBox(width: 4),
+                    Text(
+                      'Toca para ver perfil de la mascota',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.primaryColor,
+                        fontStyle: FontStyle.italic,
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
         ),
       ),
     );

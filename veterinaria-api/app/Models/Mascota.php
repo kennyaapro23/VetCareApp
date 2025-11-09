@@ -76,10 +76,6 @@ class Mascota extends Model
         return $this->hasMany(Cita::class);
     }
 
-    public function archivos()
-    {
-        return $this->morphMany(Archivo::class, 'relacionado');
-    }
 
     /**
      * Accessor para calcular edad de la mascota

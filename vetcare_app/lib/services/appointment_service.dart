@@ -8,12 +8,23 @@ class AppointmentService {
 
   Future<List<AppointmentModel>> getAppointments({String? status}) async {
     final params = status != null ? {'estado': status} : null;
-    final resp = await _api.get<List<dynamic>>(
+    final resp = await _api.get<dynamic>(
       'citas',
-      (json) => (json is List) ? json : [],
+      (json) => json,
       queryParameters: params,
     );
-    return resp.map((e) => AppointmentModel.fromJson(e)).toList();
+    
+    // Manejar respuesta paginada: {"current_page":1,"data":[...]}
+    List<dynamic> items;
+    if (resp is Map && resp.containsKey('data')) {
+      items = resp['data'] as List<dynamic>;
+    } else if (resp is List) {
+      items = resp;
+    } else {
+      items = [];
+    }
+    
+    return items.map((e) => AppointmentModel.fromJson(e)).toList();
   }
 
   Future<AppointmentModel> createAppointment(Map<String, dynamic> data) async {

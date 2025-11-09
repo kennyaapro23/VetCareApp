@@ -4,7 +4,6 @@ namespace App\Http\Controllers;
 
 use App\Models\HistorialMedico;
 use App\Models\Mascota;
-use App\Models\Archivo;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\DB;
@@ -17,7 +16,7 @@ class HistorialController extends Controller
     public function index(Request $request)
     {
         $user = auth()->user();
-        $query = HistorialMedico::with(['mascota.cliente', 'cita', 'realizadoPor', 'archivos', 'servicios']);
+    $query = HistorialMedico::with(['mascota.cliente', 'cita', 'realizadoPor', 'servicios']);
 
         // Filtro por ROL
         if ($user->tipo_usuario === 'cliente') {
@@ -114,7 +113,7 @@ class HistorialController extends Controller
             'diagnostico' => 'nullable|string',
             'tratamiento' => 'nullable|string',
             'observaciones' => 'nullable|string',
-            'archivos.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB max
+            // archivos removed: file upload not supported anymore
             'servicios' => 'nullable|array',
             'servicios.*.servicio_id' => 'required|exists:servicios,id',
             'servicios.*.cantidad' => 'nullable|integer|min:1',
@@ -162,34 +161,7 @@ class HistorialController extends Controller
                 $historial->servicios()->attach($serviciosData);
             }
 
-            // Procesar archivos adjuntos
-            if ($request->hasFile('archivos')) {
-                $archivos_meta = [];
-
-                foreach ($request->file('archivos') as $file) {
-                    $path = $file->store('historial_medico', 'public');
-
-                    $archivo = Archivo::create([
-                        'relacionado_tipo' => 'App\Models\HistorialMedico',
-                        'relacionado_id' => $historial->id,
-                        'nombre' => $file->getClientOriginalName(),
-                        'url' => Storage::url($path),
-                        'tipo_mime' => $file->getMimeType(),
-                        'size' => $file->getSize(),
-                        'uploaded_by' => auth()->id(),
-                    ]);
-
-                    $archivos_meta[] = [
-                        'id' => $archivo->id,
-                        'nombre' => $archivo->nombre,
-                        'url' => $archivo->url,
-                    ];
-                }
-
-                // Guardar metadata en JSON
-                $historial->archivos_meta = $archivos_meta;
-                $historial->save();
-            }
+            // archivos handling removed: uploads are not supported
 
             // Auditoría
             \App\Models\AuditLog::create([
@@ -204,7 +176,7 @@ class HistorialController extends Controller
 
             return response()->json([
                 'message' => 'Historial médico creado exitosamente',
-                'historial' => $historial->load(['mascota', 'cita', 'realizadoPor', 'archivos', 'servicios']),
+                'historial' => $historial->load(['mascota', 'cita', 'realizadoPor', 'servicios']),
                 'total_servicios' => $historial->total_servicios
             ], 201);
 
@@ -226,7 +198,6 @@ class HistorialController extends Controller
             'mascota.cliente',
             'cita',
             'realizadoPor',
-            'archivos',
             'servicios'
         ])->findOrFail($id);
 
@@ -252,60 +223,9 @@ class HistorialController extends Controller
      */
     public function attachFiles(Request $request, $id)
     {
-        $user = auth()->user();
-        
-        // Solo VETERINARIO puede adjuntar archivos
-        if ($user->tipo_usuario !== 'veterinario') {
-            return response()->json([
-                'error' => 'Solo veterinarios pueden adjuntar archivos al historial médico'
-            ], 403);
-        }
-        
-        $historial = HistorialMedico::findOrFail($id);
-
-        $validated = $request->validate([
-            'archivos.*' => 'required|file|mimes:pdf,jpg,jpeg,png|max:10240',
-        ]);
-
-        DB::beginTransaction();
-        try {
-            $archivos_meta = $historial->archivos_meta ?? [];
-
-            foreach ($request->file('archivos') as $file) {
-                $path = $file->store('historial_medico', 'public');
-
-                $archivo = Archivo::create([
-                    'relacionado_tipo' => 'App\Models\HistorialMedico',
-                    'relacionado_id' => $historial->id,
-                    'nombre' => $file->getClientOriginalName(),
-                    'url' => Storage::url($path),
-                    'tipo_mime' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                    'uploaded_by' => auth()->id(),
-                ]);
-
-                $archivos_meta[] = [
-                    'id' => $archivo->id,
-                    'nombre' => $archivo->nombre,
-                    'url' => $archivo->url,
-                ];
-            }
-
-            $historial->archivos_meta = $archivos_meta;
-            $historial->save();
-
-            DB::commit();
-
-            return response()->json([
-                'message' => 'Archivos adjuntados exitosamente',
-                'historial' => $historial->load('archivos')
-            ]);
-
-        } catch (\Exception $e) {
-            DB::rollBack();
-            return response()->json([
-                'error' => 'Error al adjuntar archivos: ' . $e->getMessage()
-            ], 500);
-        }
+        // attachFiles removed: file upload endpoint disabled
+        return response()->json([
+            'error' => 'La funcionalidad de subir archivos fue deshabilitada'
+        ], 410);
     }
 }

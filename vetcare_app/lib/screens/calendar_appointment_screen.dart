@@ -4,9 +4,11 @@ import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/services/veterinarian_service.dart';
 import 'package:vetcare_app/services/disponibilidad_service.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
+import 'package:vetcare_app/services/servicio_service.dart';
 import 'package:vetcare_app/models/veterinarian_model.dart';
 import 'package:vetcare_app/models/agenda_disponibilidad.dart';
 import 'package:vetcare_app/models/pet_model.dart';
+import 'package:vetcare_app/models/servicio.dart';
 import 'package:vetcare_app/services/pet_service.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
@@ -26,9 +28,11 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
   VeterinarianModel? _selectedVet;
   String? _selectedTimeSlot;
   PetModel? _selectedPet;
+  List<int> _selectedServicios = []; // IDs de servicios seleccionados
 
   List<VeterinarianModel> _veterinarians = [];
   List<PetModel> _pets = [];
+  List<Servicio> _servicios = []; // Lista de servicios disponibles
   List<AgendaDisponibilidad> _disponibilidad = [];
   List<String> _availableSlots = [];
 
@@ -41,6 +45,7 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
     super.initState();
     _loadVeterinarians();
     _loadPets();
+    _loadServicios();
   }
 
   @override
@@ -76,6 +81,31 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
       }
     } catch (e) {
       debugPrint('Error cargando mascotas: $e');
+    }
+  }
+
+  Future<void> _loadServicios() async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final service = ServicioService(auth.api);
+      debugPrint('🔍 Cargando servicios disponibles...');
+      final servicios = await service.getServicios();
+      debugPrint('✅ Servicios cargados: ${servicios.length}');
+      if (mounted) {
+        setState(() {
+          _servicios = servicios;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ Error cargando servicios: $e');
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Error cargando servicios: $e'),
+            backgroundColor: AppTheme.errorColor,
+          ),
+        );
+      }
     }
   }
 
@@ -186,14 +216,34 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
       final auth = context.read<AuthProvider>();
       final service = AppointmentService(auth.api);
 
-      final data = {
-        'veterinario_id': int.parse(_selectedVet!.id),
+      // Combinar fecha y hora seleccionadas en un único DateTime y convertir a UTC.
+      DateTime appointmentDateTime;
+      try {
+        final parts = _selectedTimeSlot!.split(':');
+        final hour = int.parse(parts[0]);
+        final minute = int.parse(parts[1]);
+        appointmentDateTime = DateTime(
+          _selectedDay!.year,
+          _selectedDay!.month,
+          _selectedDay!.day,
+          hour,
+          minute,
+        );
+      } catch (_) {
+        appointmentDateTime = DateTime(_selectedDay!.year, _selectedDay!.month, _selectedDay!.day);
+      }
+
+      final data = <String, dynamic>{
         'mascota_id': int.parse(_selectedPet!.id),
-        'fecha': DateFormat('yyyy-MM-dd').format(_selectedDay!),
-        'hora': _selectedTimeSlot,
-        'motivo': _motivoController.text.trim(),
-        'estado': 'pendiente',
+        'veterinario_id': int.parse(_selectedVet!.id),
+        'fecha': appointmentDateTime.toUtc().toIso8601String(), // ISO8601 UTC
+        if (_motivoController.text.trim().isNotEmpty) 'motivo': _motivoController.text.trim(),
       };
+
+      // Enviar servicios como lista de IDs (si hay) — el backend acepta null/omitir si no hay.
+      if (_selectedServicios.isNotEmpty) {
+        data['servicios'] = _selectedServicios;
+      }
 
       await service.createAppointment(data);
 
@@ -211,6 +261,7 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
           _selectedTimeSlot = null;
           _selectedVet = null;
           _selectedPet = null;
+          _selectedServicios.clear();
           _availableSlots = [];
           _motivoController.clear();
         });
@@ -300,6 +351,13 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
                             border: OutlineInputBorder(),
                           ),
                         ),
+
+                        const SizedBox(height: 24),
+
+                        // Paso 6: Servicios
+                        _buildSectionTitle('6. Servicios (opcional)', Icons.medical_services),
+                        const SizedBox(height: 8),
+                        _buildServiciosSelector(isDark),
 
                         const SizedBox(height: 24),
 
@@ -608,6 +666,85 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
                 ),
               ),
             ),
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _buildServiciosSelector(bool isDark) {
+    if (_servicios.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          ),
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.info_outline, size: 48, color: AppTheme.textSecondary),
+            const SizedBox(height: 8),
+            const Text(
+              'No hay servicios disponibles',
+              style: TextStyle(color: AppTheme.textSecondary),
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              'Los servicios deben ser creados por el administrador',
+              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 12),
+            TextButton.icon(
+              onPressed: _loadServicios,
+              icon: const Icon(Icons.refresh),
+              label: const Text('Reintentar'),
+            ),
+          ],
+        ),
+      );
+    }
+
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkCard : Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: _servicios.map((servicio) {
+          final isSelected = _selectedServicios.contains(servicio.id);
+          return CheckboxListTile(
+            value: isSelected,
+            onChanged: (value) {
+              setState(() {
+                if (value == true) {
+                  _selectedServicios.add(servicio.id);
+                } else {
+                  _selectedServicios.remove(servicio.id);
+                }
+              });
+            },
+            title: Text(
+              servicio.nombre,
+              style: const TextStyle(fontWeight: FontWeight.w500),
+            ),
+            subtitle: Text(
+              '${servicio.tipo} - \$${servicio.precio.toStringAsFixed(2)}',
+              style: TextStyle(
+                fontSize: 12,
+                color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+              ),
+            ),
+            activeColor: AppTheme.primaryColor,
+            dense: true,
           );
         }).toList(),
       ),

@@ -94,6 +94,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/veterinarios/{id}/slots', [VeterinarioController::class, 'getSlotsDisponibles']); // 🆕 Slots listos para frontend
     
     // Gestión individual de horarios (CRUD)
+    Route::get('/veterinarios/{id}/horarios', [VeterinarioController::class, 'getHorarios']); // Listar todos
     Route::post('/veterinarios/{id}/horarios', [VeterinarioController::class, 'addHorario']); // Agregar uno
     Route::put('/veterinarios/{veterinarioId}/horarios/{horarioId}', [VeterinarioController::class, 'updateHorario']); // Editar uno
     Route::delete('/veterinarios/{veterinarioId}/horarios/{horarioId}', [VeterinarioController::class, 'deleteHorario']); // Eliminar uno
@@ -110,7 +111,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/historial-medico', [HistorialController::class, 'index']);
     Route::post('/historial-medico', [HistorialController::class, 'store']);
     Route::get('/historial-medico/{id}', [HistorialController::class, 'show']);
-    Route::post('/historial-medico/{id}/archivos', [HistorialController::class, 'attachFiles']);
+    // archivos endpoint removed
     
     // Notificaciones
     Route::get('/notificaciones', [NotificacionController::class, 'index']);

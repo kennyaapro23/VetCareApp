@@ -44,10 +44,6 @@ class HistorialMedico extends Model
         return $this->belongsTo(Veterinario::class, 'realizado_por');
     }
 
-    public function archivos()
-    {
-        return $this->morphMany(Archivo::class, 'relacionado');
-    }
 
     /**
      * Servicios aplicados en esta consulta

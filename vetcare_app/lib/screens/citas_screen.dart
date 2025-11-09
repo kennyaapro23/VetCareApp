@@ -6,6 +6,7 @@ import 'package:vetcare_app/services/appointment_service.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'calendar_appointment_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class CitasScreen extends StatefulWidget {
   const CitasScreen({super.key});
@@ -214,6 +215,21 @@ class _AppointmentCard extends StatelessWidget {
     required this.onCancel,
   });
 
+  void _navigateToPetProfile(BuildContext context) {
+    if (appointment.petId.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('No se puede abrir el perfil: ID de mascota no disponible'),
+          backgroundColor: AppTheme.errorColor,
+        ),
+      );
+      return;
+    }
+    
+    // Navegar al perfil de la mascota usando GoRouter
+    context.go('/pet-detail/${appointment.petId}');
+  }
+
   @override
   Widget build(BuildContext context) {
     final dateStr = appointment.date != null
@@ -226,18 +242,21 @@ class _AppointmentCard extends StatelessWidget {
     if (appointment.status == 'atendida') statusColor = AppTheme.successColor;
     if (appointment.status == 'cancelada') statusColor = AppTheme.errorColor;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+    return InkWell(
+      onTap: () => _navigateToPetProfile(context),
+      borderRadius: BorderRadius.circular(12),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 12),
+        decoration: BoxDecoration(
+          color: isDark ? AppTheme.darkCard : Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(
+            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          ),
         ),
-      ),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -296,9 +315,25 @@ class _AppointmentCard extends StatelessWidget {
                 ],
               ),
             ],
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                const Icon(Icons.touch_app, size: 14, color: AppTheme.primaryColor),
+                const SizedBox(width: 4),
+                Text(
+                  'Toca para ver perfil de la mascota',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.primaryColor,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),
+    ),
     );
   }
 }

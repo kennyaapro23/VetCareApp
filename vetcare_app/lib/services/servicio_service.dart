@@ -11,12 +11,23 @@ class ServicioService {
     final params = <String, String>{};
     if (tipo != null) params['tipo'] = tipo;
 
-    final resp = await _api.get<List<dynamic>>(
+    final resp = await _api.get<dynamic>(
       'servicios',
-      (json) => (json is List) ? json : [],
+      (json) => json,
       queryParameters: params.isNotEmpty ? params : null,
     );
-    return resp.map((e) => Servicio.fromJson(e as Map<String, dynamic>)).toList();
+    
+    // Manejar respuesta paginada: {"current_page":1,"data":[...]}
+    List<dynamic> items;
+    if (resp is Map && resp.containsKey('data')) {
+      items = resp['data'] as List<dynamic>;
+    } else if (resp is List) {
+      items = resp;
+    } else {
+      items = [];
+    }
+    
+    return items.map((e) => Servicio.fromJson(e as Map<String, dynamic>)).toList();
   }
 
   /// Obtener un servicio específico por ID

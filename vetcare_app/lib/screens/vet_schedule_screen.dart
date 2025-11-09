@@ -67,6 +67,34 @@ class _VetScheduleScreenState extends State<VetScheduleScreen> {
     }
   }
 
+  /// Convertir día de español a número (0=Domingo, 1=Lunes, etc)
+  int _convertirDiaANumero(String dia) {
+    const mapa = {
+      'domingo': 0,
+      'lunes': 1,
+      'martes': 2,
+      'miércoles': 3,
+      'jueves': 4,
+      'viernes': 5,
+      'sábado': 6,
+    };
+    return mapa[dia.toLowerCase()] ?? 1; // Default: Lunes
+  }
+
+  /// Convertir número a día en español
+  String _convertirNumeroADia(int numero) {
+    const mapa = {
+      0: 'domingo',
+      1: 'lunes',
+      2: 'martes',
+      3: 'miércoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sábado',
+    };
+    return mapa[numero] ?? 'lunes';
+  }
+
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -406,15 +434,16 @@ class _VetScheduleScreenState extends State<VetScheduleScreen> {
       }
 
       final service = DisponibilidadService(auth.api);
+      
+      // Convertir día de español a número (backend espera int)
+      final diaNumero = _convertirDiaANumero(dia);
+      
       await service.createDisponibilidad(vetId, {
-        'horarios': [
-          {
-            'dia_semana': dia,
-            'hora_inicio': inicio,
-            'hora_fin': fin,
-            'disponible': true,
-          }
-        ],
+        'dia_semana': diaNumero, // int (0-6)
+        'hora_inicio': inicio, // string "HH:mm"
+        'hora_fin': fin, // string "HH:mm"
+        'intervalo_minutos': 30, // int
+        'activo': true, // bool
       });
 
       if (mounted) {
@@ -448,10 +477,15 @@ class _VetScheduleScreenState extends State<VetScheduleScreen> {
       }
 
       final service = DisponibilidadService(auth.api);
+      
+      // Convertir día de español a número
+      final diaNumero = _convertirDiaANumero(dia);
+      
       await service.updateDisponibilidad(vetId, id, {
-        'dia_semana': dia,
-        'hora_inicio': inicio,
-        'hora_fin': fin,
+        'dia_semana': diaNumero, // int (0-6)
+        'hora_inicio': inicio, // string "HH:mm"
+        'hora_fin': fin, // string "HH:mm"
+        'intervalo_minutos': 30, // int
       });
 
       if (mounted) {

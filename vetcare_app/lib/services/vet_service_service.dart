@@ -7,11 +7,22 @@ class VetServiceService {
   VetServiceService(this._api);
 
   Future<List<ServiceModel>> getServices() async {
-    final resp = await _api.get<List<dynamic>>(
+    final resp = await _api.get<dynamic>(
       'servicios',
-      (json) => (json is List) ? json : [],
+      (json) => json,
     );
-    return resp.map((e) => ServiceModel.fromJson(e)).toList();
+    
+    // Manejar respuesta paginada: {"current_page":1,"data":[...]}
+    List<dynamic> items;
+    if (resp is Map && resp.containsKey('data')) {
+      items = resp['data'] as List<dynamic>;
+    } else if (resp is List) {
+      items = resp;
+    } else {
+      items = [];
+    }
+    
+    return items.map((e) => ServiceModel.fromJson(e)).toList();
   }
 
   // TODO: Esta ruta no existe en el backend Laravel

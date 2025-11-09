@@ -19,8 +19,7 @@ class Cita extends Model
         'motivo',
         'notas',
         'created_by',
-        'lugar',
-        'direccion',
+        // 'lugar' and 'direccion' removed: all appointments are in-clinic now
     ];
 
     protected $casts = [
@@ -64,10 +63,6 @@ class Cita extends Model
         return $this->hasMany(Factura::class);
     }
 
-    public function archivos()
-    {
-        return $this->morphMany(Archivo::class, 'relacionado');
-    }
 
     /**
      * Verificar si esta cita se solapa con otra en el rango de tiempo dado

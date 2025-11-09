@@ -153,8 +153,7 @@ class MascotaController extends Controller
             },
             'citas' => function ($query) {
                 $query->latest()->limit(10)->with(['veterinario', 'servicios']);
-            },
-            'archivos'
+            }
         ])->findOrFail($id);
 
         // Si es CLIENTE, verificar que la mascota le pertenece

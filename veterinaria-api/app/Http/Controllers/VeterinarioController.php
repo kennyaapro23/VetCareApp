@@ -411,6 +411,25 @@ class VeterinarioController extends Controller
     }
 
     /**
+     * Listar todos los horarios de un veterinario
+     */
+    public function getHorarios($id)
+    {
+        $veterinario = Veterinario::findOrFail($id);
+
+        $horarios = AgendaDisponibilidad::where('veterinario_id', $id)
+            ->orderBy('dia_semana')
+            ->orderBy('hora_inicio')
+            ->get();
+
+        return response()->json([
+            'veterinario' => $veterinario->only(['id', 'nombre', 'especialidad']),
+            'horarios' => $horarios,
+            'total' => $horarios->count(),
+        ]);
+    }
+
+    /**
      * Agregar un horario individual sin eliminar los demás
      */
     public function addHorario(Request $request, $id)

@@ -8,12 +8,15 @@ class DisponibilidadService {
 
   Future<List<AgendaDisponibilidad>> getDisponibilidad(String veterinarioId) async {
     final resp = await _api.get<dynamic>(
-      'veterinarios/$veterinarioId/disponibilidad',
+      'veterinarios/$veterinarioId/horarios',
       (json) => json,
     );
 
     List<dynamic> dataList;
-    if (resp is Map && resp.containsKey('data')) {
+    if (resp is Map && resp.containsKey('horarios')) {
+      // Backend devuelve: { "horarios": [...] }
+      dataList = (resp['horarios'] is List) ? resp['horarios'] : [];
+    } else if (resp is Map && resp.containsKey('data')) {
       dataList = (resp['data'] is List) ? resp['data'] : [];
     } else if (resp is List) {
       dataList = resp;
@@ -24,68 +27,83 @@ class DisponibilidadService {
     return dataList.map((e) => AgendaDisponibilidad.fromJson(e)).toList();
   }
 
+  /// Agregar UN horario individual
+  /// Endpoint: POST /api/veterinarios/{id}/horarios
   Future<AgendaDisponibilidad> createDisponibilidad(
     String veterinarioId,
     Map<String, dynamic> data,
   ) async {
     final resp = await _api.post<dynamic>(
-      'veterinarios/$veterinarioId/disponibilidad',
+      'veterinarios/$veterinarioId/horarios', // ⭐ Cambio de endpoint
       data,
       (json) => json,
     );
 
-    // El backend puede devolver un array de horarios o un objeto
+    // Extraer el horario de la respuesta
     dynamic horarioData;
-    if (resp is Map && resp.containsKey('data')) {
+    if (resp is Map && resp.containsKey('horario')) {
+      horarioData = resp['horario'];
+    } else if (resp is Map && resp.containsKey('data')) {
       horarioData = resp['data'];
-    } else {
+    } else if (resp is Map) {
       horarioData = resp;
+    } else {
+      throw Exception('Formato de respuesta inesperado del servidor');
     }
 
-    // Si es un array, tomar el primer elemento
-    if (horarioData is List && horarioData.isNotEmpty) {
-      return AgendaDisponibilidad.fromJson(horarioData[0]);
-    } else if (horarioData is Map) {
-      return AgendaDisponibilidad.fromJson(horarioData);
-    }
-
-    throw Exception('Formato de respuesta inesperado del servidor');
+    return AgendaDisponibilidad.fromJson(horarioData);
   }
 
+  /// Actualizar un horario existente
+  /// Endpoint: PUT /api/veterinarios/{veterinarioId}/horarios/{horarioId}
   Future<AgendaDisponibilidad> updateDisponibilidad(
     String veterinarioId,
     String horarioId,
     Map<String, dynamic> data,
   ) async {
-    final resp = await _api.put<Map<String, dynamic>>(
-      'veterinarios/$veterinarioId/disponibilidad/$horarioId',
+    final resp = await _api.put<dynamic>(
+      'veterinarios/$veterinarioId/horarios/$horarioId', // ⭐ Cambio
       data,
-      (json) => json as Map<String, dynamic>,
+      (json) => json,
     );
 
-    final horarioData = resp['data'] ?? resp;
+    dynamic horarioData;
+    if (resp is Map && resp.containsKey('horario')) {
+      horarioData = resp['horario'];
+    } else if (resp is Map && resp.containsKey('data')) {
+      horarioData = resp['data'];
+    } else if (resp is Map) {
+      horarioData = resp;
+    } else {
+      throw Exception('Formato de respuesta inesperado');
+    }
+
     return AgendaDisponibilidad.fromJson(horarioData);
   }
 
+  /// Activar/Desactivar horario (usa GET por limitación de ApiService)
+  /// Endpoint real: PATCH /api/veterinarios/{veterinarioId}/horarios/{horarioId}/toggle
   Future<void> toggleDisponibilidad(
     String veterinarioId,
     String horarioId,
     bool disponible,
   ) async {
-    await _api.put<Map<String, dynamic>>(
-      'veterinarios/$veterinarioId/disponibilidad/$horarioId',
-      {'disponible': disponible},
-      (json) => json as Map<String, dynamic>,
+    // Nota: ApiService no tiene método PATCH, el backend debe aceptar GET en /toggle
+    await _api.get<dynamic>(
+      'veterinarios/$veterinarioId/horarios/$horarioId/toggle', // ⭐ Cambio
+      (json) => json,
     );
   }
 
+  /// Eliminar un horario
+  /// Endpoint: DELETE /api/veterinarios/{veterinarioId}/horarios/{horarioId}
   Future<void> deleteDisponibilidad(
     String veterinarioId,
     String horarioId,
   ) async {
-    await _api.delete<Map<String, dynamic>>(
-      'veterinarios/$veterinarioId/disponibilidad/$horarioId',
-      (json) => json as Map<String, dynamic>,
+    await _api.delete<dynamic>(
+      'veterinarios/$veterinarioId/horarios/$horarioId', // ⭐ Cambio de endpoint
+      (json) => json,
     );
   }
 }

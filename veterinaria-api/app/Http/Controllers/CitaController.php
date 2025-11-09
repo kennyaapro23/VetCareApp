@@ -108,6 +108,13 @@ class CitaController extends Controller
     {
         $user = auth()->user();
         
+        // Normalize `servicios`: accept one id (int/string), an array of ids, or null.
+        // If a single id is sent (e.g. servicios: 3) we convert it to [3] so validation
+        // and later logic work uniformly.
+        if ($request->has('servicios') && !is_array($request->input('servicios'))) {
+            $request->merge(['servicios' => [$request->input('servicios')]]);
+        }
+
         // Si es CLIENTE, auto-asignar su cliente_id (no puede crear citas para otros)
         if ($user->tipo_usuario === 'cliente') {
             $cliente = $user->cliente;
@@ -119,15 +126,14 @@ class CitaController extends Controller
             }
             
             // Validación para CLIENTE (no requiere cliente_id, se asigna automáticamente)
+            // `servicios` puede ser null, o una lista de ids; ya normalizamos un id simple arriba.
             $validated = $request->validate([
                 'mascota_id' => 'required|exists:mascotas,id',
                 'veterinario_id' => 'required|exists:veterinarios,id',
                 'fecha' => 'required|date|after:now',
                 'motivo' => 'nullable|string|max:255',
                 'notas' => 'nullable|string',
-                'lugar' => 'required|in:clinica,a_domicilio,teleconsulta',
-                'direccion' => 'nullable|string',
-                'servicios' => 'required|array|min:1',
+                'servicios' => 'nullable|array',
                 'servicios.*' => 'exists:servicios,id',
             ]);
             
@@ -143,9 +149,7 @@ class CitaController extends Controller
                 'fecha' => 'required|date|after:now',
                 'motivo' => 'nullable|string|max:255',
                 'notas' => 'nullable|string',
-                'lugar' => 'required|in:clinica,a_domicilio,teleconsulta',
-                'direccion' => 'nullable|string',
-                'servicios' => 'required|array|min:1',
+                'servicios' => 'nullable|array',
                 'servicios.*' => 'exists:servicios,id',
             ]);
         }
@@ -158,16 +162,17 @@ class CitaController extends Controller
             ], 422);
         }
 
-        // 2. Si es a domicilio, validar dirección
-        if ($validated['lugar'] === 'a_domicilio' && empty($validated['direccion'])) {
-            return response()->json([
-                'error' => 'Debe proporcionar una dirección para citas a domicilio'
-            ], 422);
-        }
+        // 2. Lugar/direccion removed: all appointments are in-clinic -> no domicilio validation
 
         // 3. Calcular duración total por servicios
-        $servicios = Servicio::whereIn('id', $validated['servicios'])->get();
-        $duracion_total = $servicios->sum('duracion_minutos');
+        // Si no se enviaron servicios, usamos una duración por defecto (30 minutos).
+        $defaultDuration = 30;
+        $duracion_total = $defaultDuration;
+        $servicios = collect();
+        if (!empty($validated['servicios'])) {
+            $servicios = Servicio::whereIn('id', $validated['servicios'])->get();
+            $duracion_total = $servicios->sum('duracion_minutos');
+        }
 
         // 4. Verificar disponibilidad del veterinario (evitar solapamiento)
         $fecha = Carbon::parse($validated['fecha']);
@@ -214,17 +219,18 @@ class CitaController extends Controller
                 'motivo' => $validated['motivo'] ?? null,
                 'notas' => $validated['notas'] ?? null,
                 'created_by' => auth()->id(),
-                'lugar' => $validated['lugar'],
-                'direccion' => $validated['direccion'] ?? null,
+                // lugar/direccion removed: default behavior is in-clinic
             ]);
 
             // 6. Adjuntar servicios con precios actuales (trazabilidad histórica)
-            foreach ($servicios as $servicio) {
-                $cita->servicios()->attach($servicio->id, [
-                    'cantidad' => 1,
-                    'precio_unitario' => $servicio->precio,
-                    'notas' => null,
-                ]);
+            if ($servicios->isNotEmpty()) {
+                foreach ($servicios as $servicio) {
+                    $cita->servicios()->attach($servicio->id, [
+                        'cantidad' => 1,
+                        'precio_unitario' => $servicio->precio,
+                        'notas' => null,
+                    ]);
+                }
             }
 
             // 7. Crear notificación en base de datos

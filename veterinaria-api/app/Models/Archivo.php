@@ -21,7 +21,8 @@ class Archivo extends Model
 
     public function relacionado()
     {
-        return $this->morphTo();
+        // Use Spanish column names if the DB uses 'relacionado_tipo' and 'relacionado_id'
+        return $this->morphTo(null, 'relacionado_tipo', 'relacionado_id');
     }
 
     public function uploadedBy()

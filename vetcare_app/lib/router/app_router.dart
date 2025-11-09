@@ -25,7 +25,7 @@ class AppRouter {
           final user = authProvider.user;
           final location = state.matchedLocation;
 
-          debugPrint('🔀 Router redirect: location=$location, isLoading=$isLoading, user=${user?.email}');
+          debugPrint('🔀 Router redirect: location=$location, isLoading=$isLoading, user=${user?.email}, role=${user?.role}');
 
           // Si está cargando, mostrar splash
           if (isLoading) {
@@ -81,7 +81,7 @@ class AppRouter {
             pageBuilder: (context, state) => _buildPageWithFadeTransition(
               context,
               state,
-              _getHomeScreenForRole(authProvider.user?.role ?? 'cliente'),
+              _getHomeScreenForRole(),
             ),
           ),
           GoRoute(
@@ -135,14 +135,34 @@ class AppRouter {
         ],
       );
 
-  Widget _getHomeScreenForRole(String role) {
-    final r = role.toLowerCase();
-    if (r.contains('vet') || r.contains('veterinario')) {
-      return const VetHomeScreen();
+  Widget _getHomeScreenForRole() {
+    final user = authProvider.user;
+    debugPrint('🏠 Seleccionando home para usuario: ${user?.email}, role=${user?.role}, roles=${user?.roles}');
+
+    // Si el modelo tiene helpers, úsalos primero
+    if (user != null) {
+      try {
+        if (user.esVeterinario) {
+          debugPrint('✅ Usuario marcado como veterinario (helper) - asignando VetHomeScreen');
+          return const VetHomeScreen();
+        }
+      } catch (e) {
+        // ignorar si el helper no existe por alguna razón
+      }
+
+      final roleStr = user.role.toLowerCase().trim();
+      if (roleStr == 'veterinario' || roleStr.contains('vet')) {
+        debugPrint('✅ Asignando VetHomeScreen (por role string)');
+        return const VetHomeScreen();
+      }
+      if (roleStr == 'recepcion' || roleStr.contains('recep')) {
+        debugPrint('✅ Asignando ReceptionistHomeScreen (por role string)');
+        return const ReceptionistHomeScreen();
+      }
     }
-    if (r.contains('recep')) {
-      return const ReceptionistHomeScreen();
-    }
+
+    // Por defecto: cliente
+    debugPrint('✅ Asignando ClientHomeScreen (default)');
     return const ClientHomeScreen();
   }
 

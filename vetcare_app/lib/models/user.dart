@@ -11,6 +11,7 @@ class UserModel {
   final DateTime? createdAt;
   final DateTime? updatedAt;
   final List<String>? roles;
+  final String? veterinarioId; // ID en tabla veterinarios (si es veterinario)
 
   UserModel({
     required this.id,
@@ -25,6 +26,7 @@ class UserModel {
     this.createdAt,
     this.updatedAt,
     this.roles,
+    this.veterinarioId,
   });
 
   factory UserModel.fromJson(dynamic json) {
@@ -38,7 +40,8 @@ class UserModel {
         name: (json['name'] ?? json['full_name'] ?? '').toString(),
         email: (json['email'] ?? '').toString(),
         telefono: json['telefono']?.toString() ?? json['phone']?.toString(),
-        role: (json['role'] ?? json['rol'] ?? 'cliente').toString(),
+  // El backend puede devolver el rol con varias claves: 'role', 'rol', 'tipo_usuario', 'perfil'
+  role: (json['role'] ?? json['rol'] ?? json['tipo_usuario'] ?? json['perfil'] ?? 'cliente').toString(),
         tipoUsuario: json['tipo_usuario']?.toString(),
         avatarUrl: json['avatar']?.toString() ?? json['avatar_url']?.toString(),
         emailVerifiedAt: json['email_verified_at'] != null
@@ -50,12 +53,48 @@ class UserModel {
         updatedAt: json['updated_at'] != null
             ? DateTime.tryParse(json['updated_at'].toString())
             : null,
-        roles: json['roles'] != null
-            ? List<String>.from(json['roles'])
-            : null,
+        roles: _parseRoles(json['roles']),
+        veterinarioId: json['veterinario_id']?.toString(),
       );
     }
     throw ArgumentError('Invalid json for UserModel');
+  }
+
+  // Helper para parsear roles que pueden venir como lista de strings o lista de objetos
+  static List<String>? _parseRoles(dynamic raw) {
+    if (raw == null) return null;
+    try {
+      if (raw is List) {
+        final out = <String>[];
+        for (final item in raw) {
+          if (item is String) {
+            out.add(item);
+          } else if (item is Map) {
+            // intentar varias claves comunes
+            if (item.containsKey('name')) out.add(item['name'].toString());
+            else if (item.containsKey('rol')) out.add(item['rol'].toString());
+            else if (item.containsKey('role')) out.add(item['role'].toString());
+            else if (item.containsKey('tipo')) out.add(item['tipo'].toString());
+            else if (item.containsKey('tipo_usuario')) out.add(item['tipo_usuario'].toString());
+            else {
+              // Si es un mapa sin claves conocidas, convertir a string por seguridad
+              out.add(item.toString());
+            }
+          } else {
+            out.add(item.toString());
+          }
+        }
+        return out.isNotEmpty ? out : null;
+      }
+      // Si viene como string separado por comas
+      if (raw is String) {
+        final parts = raw.split(',').map((s) => s.trim()).where((s) => s.isNotEmpty).toList();
+        return parts.isNotEmpty ? parts : null;
+      }
+    } catch (e) {
+      // ignorar y devolver null
+    }
+    return null;
   }
 
   Map<String, dynamic> toJson() => {

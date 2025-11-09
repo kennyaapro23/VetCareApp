@@ -14,15 +14,34 @@ class CitaController extends Controller
 {
     public function index(Request $request)
     {
+        $user = auth()->user();
         $query = Cita::with(['cliente', 'mascota', 'veterinario', 'servicios']);
 
-        // Filtro por veterinario
+        // Filtro por ROL
+        if ($user->tipo_usuario === 'cliente') {
+            // CLIENTE: Solo ve sus propias citas
+            $cliente = $user->cliente;
+            if (!$cliente) {
+                return response()->json(['citas' => []]);
+            }
+            $query->where('cliente_id', $cliente->id);
+            
+        } elseif ($user->tipo_usuario === 'veterinario') {
+            // VETERINARIO: Solo ve sus propias citas (a menos que se filtre por otro)
+            $veterinario = $user->veterinario;
+            if ($veterinario && !$request->has('veterinario_id')) {
+                $query->where('veterinario_id', $veterinario->id);
+            }
+        }
+        // RECEPCIÓN: Ve todas las citas sin filtro
+
+        // Filtro por veterinario (solo para recepción o si veterinario consulta otro)
         if ($request->has('veterinario_id')) {
             $query->where('veterinario_id', $request->veterinario_id);
         }
 
-        // Filtro por cliente
-        if ($request->has('cliente_id')) {
+        // Filtro por cliente (solo para recepción/veterinario)
+        if ($request->has('cliente_id') && $user->tipo_usuario !== 'cliente') {
             $query->where('cliente_id', $request->cliente_id);
         }
 
@@ -87,18 +106,49 @@ class CitaController extends Controller
 
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'cliente_id' => 'required|exists:clientes,id',
-            'mascota_id' => 'required|exists:mascotas,id',
-            'veterinario_id' => 'required|exists:veterinarios,id',
-            'fecha' => 'required|date|after:now',
-            'motivo' => 'nullable|string|max:255',
-            'notas' => 'nullable|string',
-            'lugar' => 'required|in:clinica,a_domicilio,teleconsulta',
-            'direccion' => 'nullable|string',
-            'servicios' => 'required|array|min:1',
-            'servicios.*' => 'exists:servicios,id',
-        ]);
+        $user = auth()->user();
+        
+        // Si es CLIENTE, auto-asignar su cliente_id (no puede crear citas para otros)
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            
+            if (!$cliente) {
+                return response()->json([
+                    'error' => 'No tienes un perfil de cliente asociado'
+                ], 403);
+            }
+            
+            // Validación para CLIENTE (no requiere cliente_id, se asigna automáticamente)
+            $validated = $request->validate([
+                'mascota_id' => 'required|exists:mascotas,id',
+                'veterinario_id' => 'required|exists:veterinarios,id',
+                'fecha' => 'required|date|after:now',
+                'motivo' => 'nullable|string|max:255',
+                'notas' => 'nullable|string',
+                'lugar' => 'required|in:clinica,a_domicilio,teleconsulta',
+                'direccion' => 'nullable|string',
+                'servicios' => 'required|array|min:1',
+                'servicios.*' => 'exists:servicios,id',
+            ]);
+            
+            // Auto-asignar cliente_id
+            $validated['cliente_id'] = $cliente->id;
+            
+        } else {
+            // Veterinario/Recepción pueden especificar cliente_id
+            $validated = $request->validate([
+                'cliente_id' => 'required|exists:clientes,id',
+                'mascota_id' => 'required|exists:mascotas,id',
+                'veterinario_id' => 'required|exists:veterinarios,id',
+                'fecha' => 'required|date|after:now',
+                'motivo' => 'nullable|string|max:255',
+                'notas' => 'nullable|string',
+                'lugar' => 'required|in:clinica,a_domicilio,teleconsulta',
+                'direccion' => 'nullable|string',
+                'servicios' => 'required|array|min:1',
+                'servicios.*' => 'exists:servicios,id',
+            ]);
+        }
 
         // 1. Validar que mascota pertenezca al cliente
         $mascota = Mascota::findOrFail($validated['mascota_id']);
@@ -231,15 +281,52 @@ class CitaController extends Controller
 
     public function show($id)
     {
+        $user = auth()->user();
         $cita = Cita::with(['cliente', 'mascota', 'veterinario', 'servicios', 'historialMedicos'])
             ->findOrFail($id);
+
+        // Verificar permisos por ROL
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            if (!$cliente || $cita->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para ver esta cita'
+                ], 403);
+            }
+        } elseif ($user->tipo_usuario === 'veterinario') {
+            $veterinario = $user->veterinario;
+            if (!$veterinario || $cita->veterinario_id !== $veterinario->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para ver esta cita'
+                ], 403);
+            }
+        }
+        // RECEPCIÓN puede ver cualquier cita
 
         return response()->json($cita);
     }
 
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
         $cita = Cita::findOrFail($id);
+        
+        // CLIENTE: Solo puede cancelar su propia cita
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            if (!$cliente || $cita->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para modificar esta cita'
+                ], 403);
+            }
+            
+            // Cliente solo puede cancelar
+            if ($request->has('estado') && $request->estado !== 'cancelada') {
+                return response()->json([
+                    'error' => 'Solo puedes cancelar tus citas'
+                ], 403);
+            }
+        }
 
         $validated = $request->validate([
             'fecha' => 'nullable|date|after:now',
@@ -375,7 +462,23 @@ class CitaController extends Controller
 
     public function destroy($id)
     {
+        $user = auth()->user();
         $cita = Cita::findOrFail($id);
+
+        // Verificar permisos por ROL
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            if (!$cliente || $cita->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para cancelar esta cita'
+                ], 403);
+            }
+        } elseif ($user->tipo_usuario === 'veterinario') {
+            return response()->json([
+                'error' => 'Los veterinarios no pueden eliminar citas, solo cambiar su estado'
+            ], 403);
+        }
+        // RECEPCIÓN puede cancelar cualquier cita
 
         // Solo permitir cancelación, no eliminación física
         $cita->estado = 'cancelada';

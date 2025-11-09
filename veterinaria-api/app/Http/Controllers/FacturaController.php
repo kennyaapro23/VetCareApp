@@ -120,6 +120,129 @@ class FacturaController extends Controller
     }
 
     /**
+     * Crear factura desde historiales médicos
+     */
+    public function storeFromHistoriales(Request $request)
+    {
+        $validated = $request->validate([
+            'cliente_id' => 'required|exists:clientes,id',
+            'historial_ids' => 'required|array|min:1',
+            'historial_ids.*' => 'required|exists:historial_medicos,id',
+            'metodo_pago' => 'nullable|in:efectivo,tarjeta,transferencia,otro',
+            'notas' => 'nullable|string',
+            'tasa_impuesto' => 'nullable|numeric|min:0|max:100', // Porcentaje de impuesto (ej: 16)
+        ]);
+
+        DB::beginTransaction();
+        try {
+            // Verificar que todos los historiales sean del mismo cliente
+            $historiales = \App\Models\HistorialMedico::with(['servicios', 'mascota.cliente'])
+                ->whereIn('id', $validated['historial_ids'])
+                ->get();
+
+            foreach ($historiales as $historial) {
+                if ($historial->mascota->cliente_id != $validated['cliente_id']) {
+                    return response()->json([
+                        'error' => "El historial #{$historial->id} no pertenece al cliente especificado"
+                    ], 422);
+                }
+
+                if ($historial->facturado) {
+                    return response()->json([
+                        'error' => "El historial #{$historial->id} ya ha sido facturado"
+                    ], 422);
+                }
+            }
+
+            // Generar número de factura
+            $year = date('Y');
+            $lastFactura = \App\Models\Factura::whereYear('fecha_emision', $year)
+                ->orderBy('numero_factura', 'desc')
+                ->first();
+
+            if ($lastFactura) {
+                preg_match('/(\d+)$/', $lastFactura->numero_factura, $matches);
+                $nextNumber = isset($matches[1]) ? (int)$matches[1] + 1 : 1;
+            } else {
+                $nextNumber = 1;
+            }
+
+            $numeroFactura = sprintf('FAC-%s-%05d', $year, $nextNumber);
+
+            // Calcular subtotal sumando total_servicios de cada historial
+            $subtotal = 0;
+            $historialSubtotales = [];
+
+            foreach ($historiales as $historial) {
+                $totalHistorial = $historial->total_servicios;
+                $subtotal += $totalHistorial;
+                $historialSubtotales[$historial->id] = $totalHistorial;
+            }
+
+            // Calcular impuestos (default 16% IVA si no se especifica)
+            $tasaImpuesto = $validated['tasa_impuesto'] ?? 16;
+            $impuestos = round($subtotal * ($tasaImpuesto / 100), 2);
+            $total = $subtotal + $impuestos;
+
+            // Crear factura
+            $factura = \App\Models\Factura::create([
+                'cliente_id' => $validated['cliente_id'],
+                'numero_factura' => $numeroFactura,
+                'fecha_emision' => now(),
+                'subtotal' => $subtotal,
+                'impuestos' => $impuestos,
+                'total' => $total,
+                'estado' => 'pendiente',
+                'metodo_pago' => $validated['metodo_pago'] ?? null,
+                'notas' => $validated['notas'] ?? null,
+            ]);
+
+            // Adjuntar historiales a la factura con sus subtotales
+            $pivotData = [];
+            foreach ($historialSubtotales as $historialId => $subtotalHistorial) {
+                $pivotData[$historialId] = [
+                    'subtotal' => $subtotalHistorial,
+                ];
+            }
+
+            $factura->historiales()->attach($pivotData);
+
+            // Marcar historiales como facturados
+            \App\Models\HistorialMedico::whereIn('id', $validated['historial_ids'])
+                ->update([
+                    'facturado' => true,
+                    'factura_id' => $factura->id,
+                ]);
+
+            // Auditoría
+            \App\Models\AuditLog::create([
+                'user_id' => auth()->id(),
+                'accion' => 'crear_factura_historiales',
+                'tabla' => 'facturas',
+                'registro_id' => $factura->id,
+                'cambios' => json_encode([
+                    'factura' => $factura->toArray(),
+                    'historial_ids' => $validated['historial_ids'],
+                ]),
+            ]);
+
+            DB::commit();
+
+            return response()->json([
+                'message' => 'Factura creada exitosamente desde historiales',
+                'factura' => $factura->load(['historiales.servicios', 'cliente']),
+                'total_historiales' => count($validated['historial_ids']),
+            ], 201);
+
+        } catch (\Exception $e) {
+            DB::rollBack();
+            return response()->json([
+                'error' => 'Error al crear factura: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
      * Ver factura
      */
     public function show($id)

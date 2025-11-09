@@ -19,6 +19,11 @@ class Cliente extends Model
         'documento_num',
         'direccion',
         'notas',
+        'es_walk_in', // ✅ Cliente sin cuenta registrada
+    ];
+
+    protected $casts = [
+        'es_walk_in' => 'boolean',
     ];
 
     protected static function boot()

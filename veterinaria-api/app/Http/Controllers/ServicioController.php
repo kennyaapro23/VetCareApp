@@ -9,10 +9,11 @@ use Illuminate\Support\Facades\DB;
 class ServicioController extends Controller
 {
     /**
-     * Listar servicios
+     * Listar servicios (TODOS pueden ver)
      */
     public function index(Request $request)
     {
+        // Todos los roles pueden ver servicios
         $query = Servicio::query();
 
         // Filtro por tipo
@@ -45,10 +46,19 @@ class ServicioController extends Controller
     }
 
     /**
-     * Crear servicio
+     * Crear servicio (SOLO RECEPCIÓN)
      */
     public function store(Request $request)
     {
+        $user = auth()->user();
+        
+        // Solo RECEPCIÓN puede crear servicios
+        if ($user->tipo_usuario !== 'recepcion') {
+            return response()->json([
+                'error' => 'No tienes permiso para crear servicios'
+            ], 403);
+        }
+        
         $validated = $request->validate([
             'codigo' => 'required|string|max:50|unique:servicios,codigo',
             'nombre' => 'required|string|max:150',
@@ -88,10 +98,11 @@ class ServicioController extends Controller
     }
 
     /**
-     * Ver servicio
+     * Ver servicio (TODOS pueden ver)
      */
     public function show($id)
     {
+        // Todos los roles pueden ver servicios
         $servicio = Servicio::with([
             'citas' => function ($query) {
                 $query->latest()->limit(10);
@@ -106,10 +117,19 @@ class ServicioController extends Controller
     }
 
     /**
-     * Actualizar servicio
+     * Actualizar servicio (SOLO RECEPCIÓN)
      */
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        // Solo RECEPCIÓN puede actualizar servicios
+        if ($user->tipo_usuario !== 'recepcion') {
+            return response()->json([
+                'error' => 'No tienes permiso para actualizar servicios'
+            ], 403);
+        }
+        
         $servicio = Servicio::findOrFail($id);
 
         $validated = $request->validate([
@@ -151,10 +171,19 @@ class ServicioController extends Controller
     }
 
     /**
-     * Eliminar servicio
+     * Eliminar servicio (SOLO RECEPCIÓN)
      */
     public function destroy($id)
     {
+        $user = auth()->user();
+        
+        // Solo RECEPCIÓN puede eliminar servicios
+        if ($user->tipo_usuario !== 'recepcion') {
+            return response()->json([
+                'error' => 'No tienes permiso para eliminar servicios'
+            ], 403);
+        }
+        
         $servicio = Servicio::findOrFail($id);
 
         // Verificar si está siendo usado en citas

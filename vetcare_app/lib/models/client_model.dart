@@ -1,4 +1,4 @@
-// ...existing code...
+import 'package:flutter/material.dart';
 import 'package:vetcare_app/models/pet_model.dart';
 
 class ClientModel {
@@ -8,6 +8,9 @@ class ClientModel {
   final String? address;
   final String? email;
   final List<PetModel> pets;
+  final bool esWalkIn; // Cambiado de 'tipo' a 'esWalkIn' para coincidir con backend
+  final int? userId; // Nullable: walk-ins no tienen user_id
+  final DateTime? fechaRegistro;
 
   ClientModel({
     required this.id,
@@ -16,6 +19,9 @@ class ClientModel {
     this.address,
     this.email,
     this.pets = const [],
+    this.esWalkIn = false,
+    this.userId,
+    this.fechaRegistro,
   });
 
   factory ClientModel.fromJson(dynamic json) {
@@ -28,8 +34,13 @@ class ClientModel {
       name: (map['nombre'] ?? map['name'] ?? '').toString(),
       phone: (map['telefono'] ?? map['phone'])?.toString(),
       address: (map['direccion'] ?? map['address'])?.toString(),
-      email: (map['email'] ?? '').toString(),
+      email: (map['email'])?.toString(), // Nullable
       pets: pets,
+      esWalkIn: map['es_walk_in'] ?? false, // Campo del backend
+      userId: map['user_id'] != null ? int.tryParse(map['user_id'].toString()) : null,
+      fechaRegistro: map['fecha_registro'] != null
+          ? DateTime.tryParse(map['fecha_registro'].toString())
+          : null,
     );
   }
 
@@ -40,6 +51,18 @@ class ClientModel {
         'direccion': address,
         'email': email,
         'mascotas': pets.map((e) => e.toJson()).toList(),
+        'es_walk_in': esWalkIn, // Campo del backend
+        'user_id': userId,
+        'fecha_registro': fechaRegistro?.toIso8601String(),
       };
-}
 
+  // Helpers útiles
+  bool get isWalkIn => esWalkIn;
+  bool get tieneUsuario => userId != null;
+  bool get puedeUsarApp => tieneUsuario && !esWalkIn;
+  bool get hasAccount => tieneUsuario && !esWalkIn && email != null && email!.isNotEmpty;
+
+  String get tipoBadge => esWalkIn ? 'Walk-In' : 'Registrado';
+
+  Color get tipoBadgeColor => esWalkIn ? Colors.orange : Colors.green;
+}

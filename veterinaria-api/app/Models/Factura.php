@@ -12,13 +12,21 @@ class Factura extends Model
     protected $fillable = [
         'cliente_id',
         'cita_id',
+        'numero_factura',
+        'fecha_emision',
+        'subtotal',
+        'impuestos',
         'total',
         'estado',
         'metodo_pago',
+        'notas',
         'detalles',
     ];
 
     protected $casts = [
+        'fecha_emision' => 'datetime',
+        'subtotal' => 'decimal:2',
+        'impuestos' => 'decimal:2',
         'total' => 'decimal:2',
         'detalles' => 'array',
     ];
@@ -31,5 +39,15 @@ class Factura extends Model
     public function cita()
     {
         return $this->belongsTo(Cita::class);
+    }
+
+    /**
+     * Historiales médicos incluidos en esta factura
+     */
+    public function historiales()
+    {
+        return $this->belongsToMany(HistorialMedico::class, 'factura_historial')
+                    ->withPivot('subtotal')
+                    ->withTimestamps();
     }
 }

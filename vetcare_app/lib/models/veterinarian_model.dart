@@ -1,37 +1,41 @@
-// ...existing code...
-import 'package:vetcare_app/models/appointment_model.dart';
-
 class VeterinarianModel {
   final String id;
   final String name;
-  final String? specialty;
-  final List<AppointmentModel> appointments;
+  final String? email;
+  final String? telefono;
+  final String? especialidad;
+  final String? licencia;
 
   VeterinarianModel({
     required this.id,
     required this.name,
-    this.specialty,
-    this.appointments = const [],
+    this.email,
+    this.telefono,
+    this.especialidad,
+    this.licencia,
   });
 
   factory VeterinarianModel.fromJson(dynamic json) {
     if (json == null) throw ArgumentError('json is null');
     final map = json as Map<String, dynamic>;
-    final appsJson = map['citas'] ?? map['appointments'] ?? [];
-    final apps = (appsJson as List).map((e) => AppointmentModel.fromJson(e)).toList();
+
     return VeterinarianModel(
       id: (map['id'] ?? '').toString(),
-      name: (map['nombre'] ?? map['name'] ?? '').toString(),
-      specialty: (map['especialidad'] ?? map['specialty'])?.toString(),
-      appointments: apps,
+      name: (map['name'] ?? map['nombre'] ?? '').toString(),
+      email: map['email']?.toString(),
+      telefono: map['telefono']?.toString() ?? map['phone']?.toString(),
+      especialidad: map['especialidad']?.toString(),
+      licencia: map['licencia']?.toString() ?? map['license']?.toString(),
     );
   }
 
   Map<String, dynamic> toJson() => {
         'id': id,
-        'nombre': name,
-        'especialidad': specialty,
-        'citas': appointments.map((e) => e.toJson()).toList(),
+        'name': name,
+        if (email != null) 'email': email,
+        if (telefono != null) 'telefono': telefono,
+        if (especialidad != null) 'especialidad': especialidad,
+        if (licencia != null) 'licencia': licencia,
       };
 }
 

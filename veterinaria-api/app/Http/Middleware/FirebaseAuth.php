@@ -50,10 +50,11 @@ class FirebaseAuthMiddleware
                 // Crear usuario si no existe
                 $user = User::create([
                     'firebase_uid' => $firebaseUid,
-                    'nombre' => $firebaseUser->displayName ?? 'Usuario',
+                    // DB users table has `name` and `tipo_usuario` columns
+                    'name' => $firebaseUser->displayName ?? 'Usuario',
                     'email' => $firebaseUser->email,
                     'telefono' => $firebaseUser->phoneNumber,
-                    'rol' => 'cliente', // Rol por defecto
+                    'tipo_usuario' => 'cliente', // Rol por defecto
                     'email_verified_at' => $firebaseUser->emailVerified ? now() : null,
                 ]);
             }

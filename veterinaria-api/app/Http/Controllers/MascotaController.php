@@ -15,10 +15,30 @@ class MascotaController extends Controller
      */
     public function index(Request $request)
     {
+        $user = auth()->user();
         $query = Mascota::with(['cliente']);
 
-        // Filtro por cliente
-        if ($request->has('cliente_id')) {
+        // Si el usuario es CLIENTE, solo mostrar SUS mascotas
+        if ($user->tipo_usuario === 'cliente') {
+            // Buscar el cliente asociado al usuario
+            $cliente = $user->cliente;
+            
+            if (!$cliente) {
+                return response()->json([
+                    'error' => 'No tienes un perfil de cliente asociado',
+                    'mascotas' => []
+                ], 200);
+            }
+            
+            // Filtrar solo las mascotas de este cliente
+            $query->where('cliente_id', $cliente->id);
+        }
+        
+        // Si es VETERINARIO o RECEPCIÓN, puede ver todas las mascotas
+        // (no se aplica ningún filtro adicional)
+
+        // Filtro manual por cliente_id (para veterinarios/recepción)
+        if ($request->has('cliente_id') && $user->tipo_usuario !== 'cliente') {
             $query->where('cliente_id', $request->cliente_id);
         }
 
@@ -43,17 +63,47 @@ class MascotaController extends Controller
      */
     public function store(Request $request)
     {
-        $validated = $request->validate([
-            'cliente_id' => 'required|exists:clientes,id',
-            'nombre' => 'required|string|max:100',
-            'especie' => 'required|string|max:50',
-            'raza' => 'nullable|string|max:100',
-            'sexo' => 'required|in:macho,hembra,desconocido',
-            'fecha_nacimiento' => 'nullable|date|before:today',
-            'color' => 'nullable|string|max:50',
-            'chip_id' => 'nullable|string|max:50|unique:mascotas,chip_id',
-            'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:5120', // 5MB
-        ]);
+        $user = auth()->user();
+        
+        // Si es CLIENTE, usar automáticamente su cliente_id
+        // (no puede crear mascotas para otros clientes)
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            
+            if (!$cliente) {
+                return response()->json([
+                    'error' => 'No tienes un perfil de cliente asociado'
+                ], 403);
+            }
+            
+            // Validación sin requerir cliente_id (se asigna automáticamente)
+            $validated = $request->validate([
+                'nombre' => 'required|string|max:100',
+                'especie' => 'required|string|max:50',
+                'raza' => 'nullable|string|max:100',
+                'sexo' => 'required|in:macho,hembra,desconocido',
+                'fecha_nacimiento' => 'nullable|date|before:today',
+                'color' => 'nullable|string|max:50',
+                'chip_id' => 'nullable|string|max:50|unique:mascotas,chip_id',
+                'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:5120', // 5MB
+            ]);
+            
+            // Asignar automáticamente el cliente_id del usuario autenticado
+            $validated['cliente_id'] = $cliente->id;
+        } else {
+            // Veterinario/Recepción pueden especificar el cliente_id
+            $validated = $request->validate([
+                'cliente_id' => 'required|exists:clientes,id',
+                'nombre' => 'required|string|max:100',
+                'especie' => 'required|string|max:50',
+                'raza' => 'nullable|string|max:100',
+                'sexo' => 'required|in:macho,hembra,desconocido',
+                'fecha_nacimiento' => 'nullable|date|before:today',
+                'color' => 'nullable|string|max:50',
+                'chip_id' => 'nullable|string|max:50|unique:mascotas,chip_id',
+                'foto' => 'nullable|image|mimes:jpg,jpeg,png|max:5120', // 5MB
+            ]);
+        }
 
         DB::beginTransaction();
         try {
@@ -94,6 +144,8 @@ class MascotaController extends Controller
      */
     public function show($id)
     {
+        $user = auth()->user();
+        
         $mascota = Mascota::with([
             'cliente',
             'historialMedicos' => function ($query) {
@@ -104,6 +156,17 @@ class MascotaController extends Controller
             },
             'archivos'
         ])->findOrFail($id);
+
+        // Si es CLIENTE, verificar que la mascota le pertenece
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            
+            if (!$cliente || $mascota->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para ver esta mascota'
+                ], 403);
+            }
+        }
 
         // Agregar edad calculada
         $data = $mascota->toArray();
@@ -117,7 +180,19 @@ class MascotaController extends Controller
      */
     public function update(Request $request, $id)
     {
+        $user = auth()->user();
         $mascota = Mascota::findOrFail($id);
+
+        // Si es CLIENTE, verificar que la mascota le pertenece
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            
+            if (!$cliente || $mascota->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para editar esta mascota'
+                ], 403);
+            }
+        }
 
         $validated = $request->validate([
             'cliente_id' => 'sometimes|required|exists:clientes,id',
@@ -176,7 +251,19 @@ class MascotaController extends Controller
      */
     public function destroy($id)
     {
+        $user = auth()->user();
         $mascota = Mascota::findOrFail($id);
+
+        // Si es CLIENTE, verificar que la mascota le pertenece
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            
+            if (!$cliente || $mascota->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para eliminar esta mascota'
+                ], 403);
+            }
+        }
 
         // Verificar si tiene historial médico o citas
         if ($mascota->historialMedicos()->count() > 0) {

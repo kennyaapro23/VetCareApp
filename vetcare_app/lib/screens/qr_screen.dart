@@ -7,6 +7,7 @@ import 'package:vetcare_app/services/qr_service.dart';
 import 'package:vetcare_app/models/pet_model.dart';
 import 'package:vetcare_app/models/historial_medico.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
+import 'pet_detail_screen.dart';
 
 class QRScreen extends StatefulWidget {
   const QRScreen({super.key});
@@ -59,19 +60,29 @@ class _QRScreenState extends State<QRScreen> {
 
       // Obtener información completa de la mascota
       final pet = await service.getPetByQR(code);
-      final history = await service.getMedicalHistoryByQR(code);
-      final emergency = await service.getEmergencyInfoByQR(code);
-
-      setState(() {
-        _scannedPet = pet;
-        _medicalHistory = history;
-        _emergencyInfo = emergency;
-        _isLoading = false;
-      });
 
       if (pet == null) {
         throw Exception('No se encontró información de esta mascota.');
       }
+
+      // Navegar directamente a la ficha de la mascota
+      if (!mounted) return;
+      setState(() => _isLoading = false);
+      
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PetDetailScreen(pet: pet),
+        ),
+      );
+
+      // Resetear estado después de volver
+      setState(() {
+        _showScanner = false;
+        _scannedPet = null;
+        _medicalHistory = [];
+        _emergencyInfo = null;
+      });
     } catch (e) {
       setState(() => _isLoading = false);
       if (!mounted) return;

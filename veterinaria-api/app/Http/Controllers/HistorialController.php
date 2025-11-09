@@ -16,7 +16,21 @@ class HistorialController extends Controller
      */
     public function index(Request $request)
     {
-        $query = HistorialMedico::with(['mascota.cliente', 'cita', 'realizadoPor', 'archivos']);
+        $user = auth()->user();
+        $query = HistorialMedico::with(['mascota.cliente', 'cita', 'realizadoPor', 'archivos', 'servicios']);
+
+        // Filtro por ROL
+        if ($user->tipo_usuario === 'cliente') {
+            // CLIENTE: Solo ve historiales de sus mascotas
+            $cliente = $user->cliente;
+            if (!$cliente) {
+                return response()->json(['data' => []]);
+            }
+            $query->whereHas('mascota', function ($q) use ($cliente) {
+                $q->where('cliente_id', $cliente->id);
+            });
+        }
+        // VETERINARIO y RECEPCIÓN: Ven todos los historiales
 
         // Filtro por mascota
         if ($request->has('mascota_id')) {
@@ -41,6 +55,12 @@ class HistorialController extends Controller
         // Filtro por tipo
         if ($request->has('tipo')) {
             $query->where('tipo', $request->tipo);
+        }
+
+        // Filtro por estado de facturación
+        if ($request->has('facturado')) {
+            $facturado = filter_var($request->facturado, FILTER_VALIDATE_BOOLEAN);
+            $query->where('facturado', $facturado);
         }
 
         // Búsqueda por nombre de mascota
@@ -73,13 +93,14 @@ class HistorialController extends Controller
     }
 
     /**
-     * Crear entrada de historial médico
-     * Solo veterinarios pueden crear
+     * Crear entrada de historial médico (SOLO VETERINARIO)
      */
     public function store(Request $request)
     {
-        // Verificar que el usuario es veterinario
-        if (!auth()->user()->hasRole('veterinario')) {
+        $user = auth()->user();
+        
+        // Solo VETERINARIO puede crear historiales médicos
+        if ($user->tipo_usuario !== 'veterinario') {
             return response()->json([
                 'error' => 'Solo veterinarios pueden crear registros de historial médico'
             ], 403);
@@ -94,6 +115,11 @@ class HistorialController extends Controller
             'tratamiento' => 'nullable|string',
             'observaciones' => 'nullable|string',
             'archivos.*' => 'nullable|file|mimes:pdf,jpg,jpeg,png|max:10240', // 10MB max
+            'servicios' => 'nullable|array',
+            'servicios.*.servicio_id' => 'required|exists:servicios,id',
+            'servicios.*.cantidad' => 'nullable|integer|min:1',
+            'servicios.*.precio_unitario' => 'nullable|numeric|min:0',
+            'servicios.*.notas' => 'nullable|string',
         ]);
 
         DB::beginTransaction();
@@ -117,6 +143,24 @@ class HistorialController extends Controller
                 'observaciones' => $validated['observaciones'] ?? null,
                 'realizado_por' => $veterinario->id,
             ]);
+
+            // Adjuntar servicios al historial
+            if (!empty($validated['servicios'])) {
+                $serviciosData = [];
+                
+                foreach ($validated['servicios'] as $servicioData) {
+                    // Si no se especifica precio, usar el precio del servicio
+                    $servicio = \App\Models\Servicio::findOrFail($servicioData['servicio_id']);
+                    
+                    $serviciosData[$servicioData['servicio_id']] = [
+                        'cantidad' => $servicioData['cantidad'] ?? 1,
+                        'precio_unitario' => $servicioData['precio_unitario'] ?? $servicio->precio,
+                        'notas' => $servicioData['notas'] ?? null,
+                    ];
+                }
+                
+                $historial->servicios()->attach($serviciosData);
+            }
 
             // Procesar archivos adjuntos
             if ($request->hasFile('archivos')) {
@@ -160,7 +204,8 @@ class HistorialController extends Controller
 
             return response()->json([
                 'message' => 'Historial médico creado exitosamente',
-                'historial' => $historial->load(['mascota', 'cita', 'realizadoPor', 'archivos'])
+                'historial' => $historial->load(['mascota', 'cita', 'realizadoPor', 'archivos', 'servicios']),
+                'total_servicios' => $historial->total_servicios
             ], 201);
 
         } catch (\Exception $e) {
@@ -176,21 +221,46 @@ class HistorialController extends Controller
      */
     public function show($id)
     {
+        $user = auth()->user();
         $historial = HistorialMedico::with([
             'mascota.cliente',
             'cita',
             'realizadoPor',
-            'archivos'
+            'archivos',
+            'servicios'
         ])->findOrFail($id);
 
-        return response()->json($historial);
+        // Verificar permisos por ROL
+        if ($user->tipo_usuario === 'cliente') {
+            $cliente = $user->cliente;
+            if (!$cliente || $historial->mascota->cliente_id !== $cliente->id) {
+                return response()->json([
+                    'error' => 'No tienes permiso para ver este historial médico'
+                ], 403);
+            }
+        }
+        // VETERINARIO y RECEPCIÓN pueden ver cualquier historial
+
+        return response()->json([
+            'historial' => $historial,
+            'total_servicios' => $historial->total_servicios
+        ]);
     }
 
     /**
-     * Adjuntar archivos a un historial existente
+     * Adjuntar archivos a un historial existente (SOLO VETERINARIO)
      */
     public function attachFiles(Request $request, $id)
     {
+        $user = auth()->user();
+        
+        // Solo VETERINARIO puede adjuntar archivos
+        if ($user->tipo_usuario !== 'veterinario') {
+            return response()->json([
+                'error' => 'Solo veterinarios pueden adjuntar archivos al historial médico'
+            ], 403);
+        }
+        
         $historial = HistorialMedico::findOrFail($id);
 
         $validated = $request->validate([

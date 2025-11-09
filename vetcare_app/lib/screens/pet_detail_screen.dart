@@ -10,6 +10,7 @@ import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'add_pet_screen.dart';
+import 'create_medical_record_screen.dart';
 
 class PetDetailScreen extends StatefulWidget {
   final PetModel pet;
@@ -72,34 +73,94 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = context.read<AuthProvider>();
+    final userRole = auth.user?.role.toLowerCase().trim() ?? 'cliente';
+    final isVet = userRole == 'veterinario' || userRole.contains('vet');
+    final isReception = userRole == 'recepcion' || userRole.contains('recep');
+    final isOwner = auth.user?.id == widget.pet.clientId.toString();
 
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.pet.name),
         actions: [
           PopupMenuButton(
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: 'edit',
-                child: Row(
-                  children: [
-                    Icon(Icons.edit),
-                    SizedBox(width: 8),
-                    Text('Editar'),
-                  ],
-                ),
-              ),
-              const PopupMenuItem(
-                value: 'qr',
-                child: Row(
-                  children: [
-                    Icon(Icons.qr_code),
-                    SizedBox(width: 8),
-                    Text('Ver QR'),
-                  ],
-                ),
-              ),
-            ],
+            itemBuilder: (context) {
+              List<PopupMenuEntry<String>> items = [];
+              
+              // Recepción: puede editar mascota y ver QR
+              if (isReception) {
+                items.addAll([
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit),
+                        SizedBox(width: 8),
+                        Text('Editar Mascota'),
+                      ],
+                    ),
+                  ),
+                  const PopupMenuItem(
+                    value: 'qr',
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code),
+                        SizedBox(width: 8),
+                        Text('Ver QR'),
+                      ],
+                    ),
+                  ),
+                ]);
+              }
+              // Cliente dueño: puede editar su mascota
+              else if (isOwner && !isVet) {
+                items.add(
+                  const PopupMenuItem(
+                    value: 'edit',
+                    child: Row(
+                      children: [
+                        Icon(Icons.edit),
+                        SizedBox(width: 8),
+                        Text('Editar Mascota'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+              // Veterinario: solo ver QR (no edita mascotas)
+              else if (isVet) {
+                items.add(
+                  const PopupMenuItem(
+                    value: 'qr',
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code),
+                        SizedBox(width: 8),
+                        Text('Ver QR'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              // Si no hay items, mostrar solo "Ver QR" por defecto
+              if (items.isEmpty) {
+                items.add(
+                  const PopupMenuItem(
+                    value: 'qr',
+                    child: Row(
+                      children: [
+                        Icon(Icons.qr_code),
+                        SizedBox(width: 8),
+                        Text('Ver QR'),
+                      ],
+                    ),
+                  ),
+                );
+              }
+
+              return items;
+            },
             onSelected: (value) async {
               if (value == 'edit') {
                 await Navigator.push(
@@ -135,6 +196,26 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
           _buildCitasTab(isDark),
         ],
       ),
+      floatingActionButton: isVet && _tabController.index == 1
+          ? FloatingActionButton.extended(
+              onPressed: () async {
+                // Navegar a crear historial médico
+                final result = await Navigator.push<bool>(
+                  context,
+                  MaterialPageRoute(
+                    builder: (_) => CreateMedicalRecordScreen(pet: widget.pet),
+                  ),
+                );
+                // Si se creó exitosamente, recargar datos
+                if (result == true) {
+                  _loadData();
+                }
+              },
+              icon: const Icon(Icons.add),
+              label: const Text('Nuevo Historial'),
+              backgroundColor: AppTheme.primaryColor,
+            )
+          : null,
     );
   }
 
@@ -336,66 +417,164 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: _historial.length,
-      itemBuilder: (context, index) {
-        final registro = _historial[index];
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
+    return Column(
+      children: [
+        // Filtros de fecha
+        Padding(
           padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: isDark ? AppTheme.darkCard : Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Row(
-                children: [
-                  Icon(_getIconForTipo(registro.tipo), size: 20, color: AppTheme.primaryColor),
-                  const SizedBox(width: 8),
-                  Text(
-                    registro.tipo?.toUpperCase() ?? 'CONSULTA',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w600,
-                      color: AppTheme.primaryColor,
-                    ),
-                  ),
-                  const Spacer(),
-                  Text(
-                    DateFormat('dd/MM/yyyy').format(registro.fecha),
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
-                    ),
-                  ),
-                ],
-              ),
-              if (registro.diagnostico != null) ...[
-                const SizedBox(height: 8),
-                Text(
-                  registro.diagnostico!,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-              if (registro.tratamiento != null) ...[
-                const SizedBox(height: 4),
-                Text(
-                  registro.tratamiento!,
-                  style: TextStyle(
-                    color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
-                  ),
-                ),
-              ],
+              _buildFiltroChip('Todos', 'todos', isDark),
+              _buildFiltroChip('Último mes', 'mes', isDark),
+              _buildFiltroChip('3 últimos meses', 'tres_meses', isDark),
+              _buildFiltroChip('Año actual', 'anio', isDark),
+              _buildFiltroChip('Personalizado', 'personalizado', isDark),
             ],
           ),
-        );
-      },
+        ),
+        Expanded(
+          child: ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: _historial.length,
+            itemBuilder: (context, index) {
+              final registro = _historial[index];
+              return Container(
+                margin: const EdgeInsets.only(bottom: 12),
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: isDark ? AppTheme.darkCard : Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                  ),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(_getIconForTipo(registro.tipo), size: 20, color: AppTheme.primaryColor),
+                        const SizedBox(width: 8),
+                        Text(
+                          registro.tipo.toUpperCase(),
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.primaryColor,
+                          ),
+                        ),
+                        const Spacer(),
+                        // Mostrar número de servicios y total si existen
+                        if (registro.servicios.isNotEmpty) ...[
+                          GestureDetector(
+                            onTap: () => _showServiciosDialog(registro),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.secondaryColor.withValues(alpha: 0.08),
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.15)),
+                              ),
+                              child: Row(
+                                children: [
+                                  const Icon(Icons.local_hospital, size: 14, color: AppTheme.secondaryColor),
+                                  const SizedBox(width: 6),
+                                  Text('Servicios: ${registro.servicios.length}', style: const TextStyle(fontSize: 12)),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    NumberFormat.simpleCurrency(locale: 'es').format(registro.totalServicios),
+                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.secondaryColor),
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ] else ...[
+                          Text(
+                            DateFormat('dd/MM/yyyy').format(registro.fecha),
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    if (registro.diagnostico != null) ...[
+                      const SizedBox(height: 8),
+                      Text(
+                        registro.diagnostico!,
+                        style: const TextStyle(fontWeight: FontWeight.w600),
+                      ),
+                    ],
+                    if (registro.tratamiento != null) ...[
+                      const SizedBox(height: 4),
+                      Text(
+                        registro.tratamiento!,
+                        style: TextStyle(
+                          color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _showServiciosDialog(HistorialMedico registro) async {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    return showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            const Icon(Icons.medical_services),
+            const SizedBox(width: 12),
+            Expanded(child: Text('Servicios aplicados - ${DateFormat('dd/MM/yyyy').format(registro.fecha)}')),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ...registro.servicios.map((s) {
+                final subtotal = s.pivot.cantidad * s.pivot.precioUnitario;
+                return ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: Text(s.nombre, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Cantidad: ${s.pivot.cantidad}  ·  Precio unitario: ${NumberFormat.simpleCurrency(locale: 'es').format(s.pivot.precioUnitario)}'),
+                      if (s.pivot.notas != null && s.pivot.notas!.isNotEmpty) Text('Notas: ${s.pivot.notas}'),
+                    ],
+                  ),
+                  trailing: Text(NumberFormat.simpleCurrency(locale: 'es').format(subtotal), style: const TextStyle(fontWeight: FontWeight.w700)),
+                );
+              }).toList(),
+              const SizedBox(height: 12),
+              Divider(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+              const SizedBox(height: 8),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text('Total servicios', style: TextStyle(fontWeight: FontWeight.w700)),
+                  Text(NumberFormat.simpleCurrency(locale: 'es').format(registro.totalServicios), style: const TextStyle(fontWeight: FontWeight.w700)),
+                ],
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.of(context).pop(), child: const Text('Cerrar')),
+        ],
+      ),
     );
   }
 
@@ -542,5 +721,29 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
       default:
         return AppTheme.primaryColor;
     }
+  }
+
+  Widget _buildFiltroChip(String label, String value, bool isDark) {
+    return FilterChip(
+      label: Text(label),
+      selected: false,
+      onSelected: (selected) {
+        // Lógica para filtrar historial médico por fecha
+      },
+      selectedColor: AppTheme.primaryColor,
+      backgroundColor: isDark ? AppTheme.darkCard : Colors.grey.shade200,
+      labelStyle: TextStyle(
+        color: isDark ? Colors.white : Colors.black,
+        fontWeight: FontWeight.w500,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(
+          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+          width: 1,
+        ),
+      ),
+    );
   }
 }

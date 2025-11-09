@@ -19,11 +19,14 @@ class HistorialMedico extends Model
         'observaciones',
         'realizado_por',
         'archivos_meta',
+        'facturado',
+        'factura_id',
     ];
 
     protected $casts = [
         'fecha' => 'datetime',
         'archivos_meta' => 'array',
+        'facturado' => 'boolean',
     ];
 
     public function mascota()
@@ -44,5 +47,43 @@ class HistorialMedico extends Model
     public function archivos()
     {
         return $this->morphMany(Archivo::class, 'relacionado');
+    }
+
+    /**
+     * Servicios aplicados en esta consulta
+     */
+    public function servicios()
+    {
+        return $this->belongsToMany(Servicio::class, 'historial_servicio')
+                    ->withPivot('cantidad', 'precio_unitario', 'notas')
+                    ->withTimestamps();
+    }
+
+    /**
+     * Calcular costo total de los servicios aplicados
+     */
+    public function getTotalServiciosAttribute()
+    {
+        return $this->servicios->sum(function ($servicio) {
+            return $servicio->pivot->cantidad * $servicio->pivot->precio_unitario;
+        });
+    }
+
+    /**
+     * Factura asociada (si ya fue facturado)
+     */
+    public function factura()
+    {
+        return $this->belongsTo(Factura::class);
+    }
+
+    /**
+     * Facturas que incluyen este historial (relación N:N)
+     */
+    public function facturas()
+    {
+        return $this->belongsToMany(Factura::class, 'factura_historial')
+                    ->withPivot('subtotal')
+                    ->withTimestamps();
     }
 }

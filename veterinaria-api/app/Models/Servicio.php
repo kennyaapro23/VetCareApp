@@ -32,6 +32,16 @@ class Servicio extends Model
     }
 
     /**
+     * Historiales médicos donde se aplicó este servicio
+     */
+    public function historiales()
+    {
+        return $this->belongsToMany(HistorialMedico::class, 'historial_servicio')
+                    ->withPivot('cantidad', 'precio_unitario', 'notas')
+                    ->withTimestamps();
+    }
+
+    /**
      * Verificar si el servicio es una vacuna
      */
     public function isVaccine()

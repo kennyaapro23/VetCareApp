@@ -47,26 +47,28 @@ class FirebaseAuthController extends Controller
                 // Crear usuario si no existe
                 $user = User::create([
                     'firebase_uid' => $firebaseUid,
-                    'nombre' => $firebaseUser->displayName ?? $request->additional_data['nombre'] ?? 'Usuario',
+                    // The users table uses `name` and `tipo_usuario` columns
+                    'name' => $firebaseUser->displayName ?? $request->additional_data['nombre'] ?? 'Usuario',
                     'email' => $firebaseUser->email,
                     'telefono' => $firebaseUser->phoneNumber ?? $request->additional_data['telefono'] ?? null,
-                    'rol' => $request->rol ?? 'cliente',
+                    'tipo_usuario' => $request->rol ?? 'cliente',
                     'email_verified_at' => $firebaseUser->emailVerified ? now() : null,
                 ]);
 
-                // Crear perfil según el rol
-                if ($user->rol === 'cliente') {
+                // Crear perfil según el tipo_usuario (cliente/veterinario)
+                if ($user->tipo_usuario === 'cliente') {
                     Cliente::create([
                         'user_id' => $user->id,
-                        'nombre' => $user->nombre,
+                        // Cliente table expects `nombre`
+                        'nombre' => $user->name,
                         'email' => $user->email,
                         'telefono' => $user->telefono,
                         'direccion' => $request->additional_data['direccion'] ?? null,
                     ]);
-                } elseif ($user->rol === 'veterinario') {
+                } elseif ($user->tipo_usuario === 'veterinario') {
                     Veterinario::create([
                         'user_id' => $user->id,
-                        'nombre' => $user->nombre,
+                        'nombre' => $user->name,
                         'email' => $user->email,
                         'telefono' => $user->telefono,
                         'especialidad' => $request->additional_data['especialidad'] ?? 'General',
@@ -121,13 +123,23 @@ class FirebaseAuthController extends Controller
             'especialidad' => 'sometimes|string|max:255',
         ]);
 
-        // Actualizar usuario
-        $user->update($request->only(['nombre', 'telefono']));
+        // Map incoming 'nombre' to users.name and update telefono
+        $updateData = [];
+        if ($request->has('nombre')) {
+            $updateData['name'] = $request->input('nombre');
+        }
+        if ($request->has('telefono')) {
+            $updateData['telefono'] = $request->input('telefono');
+        }
 
-        // Actualizar perfil específico
-        if ($user->rol === 'cliente' && $user->cliente) {
+        if (!empty($updateData)) {
+            $user->update($updateData);
+        }
+
+        // Actualizar perfil específico (cliente/veterinario) which store nombre
+        if ($user->tipo_usuario === 'cliente' && $user->cliente) {
             $user->cliente->update($request->only(['nombre', 'telefono', 'direccion']));
-        } elseif ($user->rol === 'veterinario' && $user->veterinario) {
+        } elseif ($user->tipo_usuario === 'veterinario' && $user->veterinario) {
             $user->veterinario->update($request->only(['nombre', 'telefono', 'especialidad']));
         }
 

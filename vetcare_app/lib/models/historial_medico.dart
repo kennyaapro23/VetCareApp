@@ -1,5 +1,46 @@
 import 'package:flutter/material.dart';
 
+class HistorialServicioPivot {
+  final int cantidad;
+  final double precioUnitario;
+  final String? notas;
+
+  HistorialServicioPivot({
+    required this.cantidad,
+    required this.precioUnitario,
+    this.notas,
+  });
+
+  factory HistorialServicioPivot.fromJson(Map<String, dynamic> json) {
+    return HistorialServicioPivot(
+      cantidad: json['cantidad'] != null ? int.tryParse(json['cantidad'].toString()) ?? 1 : 1,
+      precioUnitario: json['precio_unitario'] != null ? double.tryParse(json['precio_unitario'].toString()) ?? 0.0 : 0.0,
+      notas: json['notas']?.toString(),
+    );
+  }
+}
+
+class HistorialServicio {
+  final int id;
+  final String nombre;
+  final HistorialServicioPivot pivot;
+
+  HistorialServicio({
+    required this.id,
+    required this.nombre,
+    required this.pivot,
+  });
+
+  factory HistorialServicio.fromJson(Map<String, dynamic> json) {
+    final pivotJson = (json['pivot'] ?? {}) as Map<String, dynamic>;
+    return HistorialServicio(
+      id: json['id'] != null ? int.tryParse(json['id'].toString()) ?? 0 : 0,
+      nombre: (json['nombre'] ?? json['name'] ?? '').toString(),
+      pivot: HistorialServicioPivot.fromJson(pivotJson),
+    );
+  }
+}
+
 class HistorialMedico {
   final int? id;
   final int mascotaId;
@@ -14,6 +55,14 @@ class HistorialMedico {
   final DateTime? createdAt;
   final DateTime? updatedAt;
 
+  // Nuevos campos - Servicios
+  final List<HistorialServicio> servicios;
+  final double totalServicios;
+
+  // Nuevos campos - Facturación ⭐
+  final bool facturado;
+  final int? facturaId;
+
   HistorialMedico({
     this.id,
     required this.mascotaId,
@@ -27,6 +76,10 @@ class HistorialMedico {
     this.archivosMeta,
     this.createdAt,
     this.updatedAt,
+    this.servicios = const [],
+    this.totalServicios = 0.0,
+    this.facturado = false,
+    this.facturaId,
   });
 
   factory HistorialMedico.fromJson(Map<String, dynamic> json) {
@@ -37,6 +90,18 @@ class HistorialMedico {
         return DateTime.fromMillisecondsSinceEpoch(raw * 1000);
       }
       return DateTime.tryParse(raw.toString()) ?? DateTime.now();
+    }
+
+    // Parse servicios si vienen
+    List<HistorialServicio> servicios = [];
+    if (json['servicios'] != null && json['servicios'] is List) {
+      try {
+        servicios = (json['servicios'] as List)
+            .map((e) => HistorialServicio.fromJson(e as Map<String, dynamic>))
+            .toList();
+      } catch (_) {
+        servicios = [];
+      }
     }
 
     return HistorialMedico(
@@ -52,6 +117,10 @@ class HistorialMedico {
       archivosMeta: json['archivos_meta'] != null ? Map<String, dynamic>.from(json['archivos_meta']) : null,
       createdAt: json['created_at'] != null ? DateTime.tryParse(json['created_at'].toString()) : null,
       updatedAt: json['updated_at'] != null ? DateTime.tryParse(json['updated_at'].toString()) : null,
+      servicios: servicios,
+      totalServicios: json['total_servicios'] != null ? double.tryParse(json['total_servicios'].toString()) ?? 0.0 : 0.0,
+      facturado: json['facturado'] == true || json['facturado'] == 1,
+      facturaId: json['factura_id'] != null ? int.tryParse(json['factura_id'].toString()) : null,
     );
   }
 
@@ -67,6 +136,20 @@ class HistorialMedico {
       if (observaciones != null) 'observaciones': observaciones,
       if (realizadoPor != null) 'realizado_por': realizadoPor,
       if (archivosMeta != null) 'archivos_meta': archivosMeta,
+      'facturado': facturado,
+      if (facturaId != null) 'factura_id': facturaId,
+      if (servicios.isNotEmpty)
+        'servicios': servicios
+            .map((s) => {
+                  'id': s.id,
+                  'nombre': s.nombre,
+                  'pivot': {
+                    'cantidad': s.pivot.cantidad,
+                    'precio_unitario': s.pivot.precioUnitario,
+                    'notas': s.pivot.notas,
+                  }
+                })
+            .toList(),
     };
   }
 
@@ -85,4 +168,3 @@ class HistorialMedico {
     }
   }
 }
-

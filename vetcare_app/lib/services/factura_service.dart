@@ -36,6 +36,30 @@ class FacturaService {
     return Factura.fromJson(resp);
   }
 
+  /// Crear factura desde historiales médicos ⭐ NUEVO
+  Future<Factura> createFacturaDesdeHistoriales({
+    required int clienteId,
+    required List<int> historialIds,
+    String? metodoPago,
+    String? notas,
+    double? tasaImpuesto,
+  }) async {
+    final data = {
+      'cliente_id': clienteId,
+      'historial_ids': historialIds,
+      if (metodoPago != null) 'metodo_pago': metodoPago,
+      if (notas != null) 'notas': notas,
+      'tasa_impuesto': tasaImpuesto ?? 16,
+    };
+
+    final resp = await _api.post<Map<String, dynamic>>(
+      'facturas/desde-historiales',
+      data,
+      (json) => (json is Map<String, dynamic>) ? json : {},
+    );
+    return Factura.fromJson(resp);
+  }
+
   Future<Factura> actualizarFactura(String id, Map<String, dynamic> data) async {
     final resp = await _api.put<Map<String, dynamic>>(
       'facturas/$id',
@@ -68,4 +92,3 @@ class FacturaService {
     return resp['numero_factura']?.toString() ?? '';
   }
 }
-

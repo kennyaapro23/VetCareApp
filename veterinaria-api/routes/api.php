@@ -81,6 +81,8 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Clientes
     Route::apiResource('clientes', ClienteController::class);
+    Route::post('/clientes/registro-rapido', [ClienteController::class, 'registroRapido']); // ✅ Walk-in (solo recepción)
+    Route::post('/cambiar-password', [ClienteController::class, 'cambiarPassword']); // 🔐 Cambiar contraseña (cualquier usuario)
     
     // Mascotas
     Route::apiResource('mascotas', MascotaController::class);
@@ -88,7 +90,14 @@ Route::middleware('auth:sanctum')->group(function () {
     // Veterinarios
     Route::apiResource('veterinarios', VeterinarioController::class);
     Route::get('/veterinarios/{id}/disponibilidad', [VeterinarioController::class, 'getDisponibilidad']);
-    Route::post('/veterinarios/{id}/disponibilidad', [VeterinarioController::class, 'setDisponibilidad']);
+    Route::post('/veterinarios/{id}/disponibilidad', [VeterinarioController::class, 'setDisponibilidad']); // Reemplaza TODOS los horarios
+    Route::get('/veterinarios/{id}/slots', [VeterinarioController::class, 'getSlotsDisponibles']); // 🆕 Slots listos para frontend
+    
+    // Gestión individual de horarios (CRUD)
+    Route::post('/veterinarios/{id}/horarios', [VeterinarioController::class, 'addHorario']); // Agregar uno
+    Route::put('/veterinarios/{veterinarioId}/horarios/{horarioId}', [VeterinarioController::class, 'updateHorario']); // Editar uno
+    Route::delete('/veterinarios/{veterinarioId}/horarios/{horarioId}', [VeterinarioController::class, 'deleteHorario']); // Eliminar uno
+    Route::patch('/veterinarios/{veterinarioId}/horarios/{horarioId}/toggle', [VeterinarioController::class, 'toggleHorario']); // Activar/Desactivar
     
     // Citas
     Route::apiResource('citas', CitaController::class);
@@ -115,6 +124,7 @@ Route::middleware('auth:sanctum')->group(function () {
     
     // Facturas
     Route::apiResource('facturas', FacturaController::class);
+    Route::post('/facturas/desde-historiales', [FacturaController::class, 'storeFromHistoriales']); // ✅ Facturar desde historiales
     Route::get('/facturas-estadisticas', [FacturaController::class, 'getEstadisticas']);
     Route::get('/generar-numero-factura', [FacturaController::class, 'generateNumeroFactura']);
 });

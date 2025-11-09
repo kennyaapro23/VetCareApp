@@ -16,7 +16,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
   final _emailC = TextEditingController();
   final _passC = TextEditingController();
   final _passConfirmC = TextEditingController();
-  String _role = 'cliente';
+  // Rol fijo como cliente - no se puede elegir
+  final String _role = 'cliente';
   bool _obscurePassword = true;
   bool _obscureConfirmPassword = true;
 
@@ -38,26 +39,26 @@ class _RegisterScreenState extends State<RegisterScreen> {
       'email': _emailC.text.trim(),
       'password': _passC.text.trim(),
       'password_confirmation': _passConfirmC.text.trim(),
-      'rol': _role,
-      'role': _role,
+      'rol': 'cliente', // Siempre cliente
+      'role': 'cliente', // Siempre cliente
     };
 
-    debugPrint('📝 Enviando datos de registro: ${data.keys.toList()}');
+    debugPrint('📝 Registrando nuevo CLIENTE (rol fijo)');
     final ok = await auth.register(data);
     if (ok) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: const Row(
+        const SnackBar(
+          content: Row(
             children: [
-              Icon(Icons.check_circle, color: Colors.black),
+              Icon(Icons.check_circle, color: Colors.white),
               SizedBox(width: 12),
-              Text('¡Registro exitoso! 🎉', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+              Text('¡Bienvenido! Tu cuenta de cliente ha sido creada 🎉',
+                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
             ],
           ),
           backgroundColor: AppTheme.successColor,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       );
       Navigator.pop(context);
@@ -65,10 +66,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(auth.error ?? 'Error en registro', style: const TextStyle(fontWeight: FontWeight.bold)),
+          content: Text(auth.error ?? 'Error en registro',
+              style: const TextStyle(fontWeight: FontWeight.bold)),
           backgroundColor: AppTheme.errorColor,
           behavior: SnackBarBehavior.floating,
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         ),
       );
     }
@@ -228,40 +229,6 @@ class _RegisterScreenState extends State<RegisterScreen> {
                       if (v != _passC.text) return 'Las contraseñas no coinciden';
                       return null;
                     },
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Tipo de usuario
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        colors: [
-                          AppTheme.primaryColor.withValues(alpha: 0.1),
-                          AppTheme.accentColor.withValues(alpha: 0.05),
-                        ],
-                      ),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.2), width: 1),
-                    ),
-                    child: DropdownButtonFormField<String>(
-                      initialValue: _role,
-                      decoration: InputDecoration(
-                        hintText: 'Tipo de usuario',
-                        prefixIcon: Icon(Icons.badge_outlined, color: AppTheme.primaryColor, size: 22),
-                        filled: false,
-                        border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-                      ),
-                      dropdownColor: AppTheme.surfaceColor,
-                      icon: Icon(Icons.arrow_drop_down, color: AppTheme.primaryColor),
-                      style: const TextStyle(fontSize: 15, color: Colors.white, fontWeight: FontWeight.w600),
-                      items: const [
-                        DropdownMenuItem(value: 'cliente', child: Text('🐾 Cliente')),
-                        DropdownMenuItem(value: 'veterinario', child: Text('⚕️ Veterinario')),
-                        DropdownMenuItem(value: 'recepcionista', child: Text('📋 Recepcionista')),
-                      ],
-                      onChanged: (v) => setState(() => _role = v ?? 'cliente'),
-                    ),
                   ),
                   const SizedBox(height: 35),
 

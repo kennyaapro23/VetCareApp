@@ -1,13 +1,18 @@
 # 👥 Roles, Vistas y Funcionalidades del Sistema VetCare
 
+> **🎯 Estado Actual:** Backend 100% completo  
+> **✅ Roles Implementados:** 3 (Cliente, Veterinario, Recepcionista)  
+> **🔮 Futuro:** Rol Admin en desarrollo futuro
+
 ## 📊 **Resumen de Roles**
 
-El sistema VetCare tiene **4 roles principales**:
+El sistema VetCare tiene **3 roles implementados**:
 
 1. 👤 **Cliente** - Dueño de mascotas
 2. 🩺 **Veterinario** - Médico veterinario
 3. 📋 **Recepcionista** - Personal administrativo
-4. 👑 **Administrador** - Gestión total del sistema
+
+> **Nota:** El rol Administrador está planeado para una versión futura
 
 ---
 
@@ -443,174 +448,55 @@ Personal administrativo que gestiona citas, registra clientes/mascotas y maneja 
 
 ---
 
-## 4️⃣ **ROL: ADMINISTRADOR** 👑
-
-### **Descripción:**
-Acceso total al sistema. Gestiona usuarios, veterinarios, servicios, configuraciones y estadísticas.
-
-### **Vistas (Pantallas en Flutter):**
-
-#### 📱 **Dashboard Admin**
-- **Estadísticas generales:**
-  - Total de clientes
-  - Total de mascotas registradas
-  - Citas del mes
-  - Ingresos del mes
-  - Gráficos de crecimiento
-- **Accesos rápidos a todas las secciones**
-
-#### 👥 **Gestión de Usuarios**
-- **Lista de usuarios:** Ver todos los usuarios del sistema
-- **Registrar nuevo usuario:**
-  - Tipo: Cliente, Veterinario, Recepcionista, Admin
-  - Datos personales
-  - Credenciales
-  - Roles y permisos
-- **Editar usuario**
-- **Activar/desactivar usuario**
-- **Resetear contraseña**
-
-#### 🩺 **Gestión de Veterinarios**
-- **Lista de veterinarios**
-- **Registrar nuevo veterinario:**
-  - Datos personales
-  - Especialidades
-  - Licencia profesional
-  - Horarios de disponibilidad
-- **Editar veterinario**
-- **Ver estadísticas de veterinario:**
-  - Citas atendidas
-  - Ingresos generados
-  - Calificación promedio
-
-#### 📋 **Gestión de Servicios**
-- **Lista de servicios disponibles**
-- **Crear nuevo servicio:**
-  - Nombre (consulta, vacuna, cirugía, etc.)
-  - Tipo
-  - Precio
-  - Duración estimada
-  - Descripción
-- **Editar servicio**
-- **Activar/desactivar servicio**
-
-#### 💰 **Reportes y Estadísticas**
-- **Ingresos:**
-  - Ingresos diarios/mensuales/anuales
-  - Gráficos de facturación
-  - Facturas pendientes
-- **Citas:**
-  - Citas por veterinario
-  - Citas por servicio
-  - Tasa de cancelación
-- **Clientes:**
-  - Nuevos clientes por mes
-  - Clientes activos
-  - Clientes inactivos
-- **Mascotas:**
-  - Mascotas por especie
-  - Mascotas por raza
-
-#### ⚙️ **Configuración del Sistema**
-- **Información de la clínica:**
-  - Nombre
-  - Dirección
-  - Teléfono
-  - Email
-  - Logo
-- **Notificaciones:**
-  - Configurar recordatorios automáticos
-  - Templates de mensajes
-- **Firebase:**
-  - Configurar FCM para notificaciones push
-
-#### 🔔 **Notificaciones**
-- **Enviar notificaciones masivas**
-- **Ver historial de notificaciones**
-
----
-
-### **Funcionalidades Detalladas:**
-
-#### ✅ **Gestión de Usuarios**
-| Funcionalidad | Endpoint | Método |
-|--------------|----------|---------|
-| Ver todos los usuarios | `/api/users` (crear este endpoint) | GET |
-| Registrar usuario | `/api/auth/register` | POST |
-| Editar usuario | `/api/users/{id}` (crear) | PUT |
-| Eliminar usuario | `/api/users/{id}` (crear) | DELETE |
-
-#### ✅ **Gestión de Veterinarios**
-| Funcionalidad | Endpoint | Método |
-|--------------|----------|---------|
-| Ver veterinarios | `/api/veterinarios` | GET |
-| Registrar veterinario | `/api/veterinarios` | POST |
-| Editar veterinario | `/api/veterinarios/{id}` | PUT |
-| Eliminar veterinario | `/api/veterinarios/{id}` | DELETE |
-
-#### ✅ **Gestión de Servicios**
-| Funcionalidad | Endpoint | Método |
-|--------------|----------|---------|
-| Ver servicios | `/api/servicios` | GET |
-| Crear servicio | `/api/servicios` | POST |
-| Editar servicio | `/api/servicios/{id}` | PUT |
-| Eliminar servicio | `/api/servicios/{id}` | DELETE |
-| Ver tipos de servicios | `/api/servicios-tipos` | GET |
-
-#### ✅ **Reportes y Estadísticas**
-| Funcionalidad | Endpoint | Método |
-|--------------|----------|---------|
-| Estadísticas de facturas | `/api/facturas-estadisticas` | GET |
-| Estadísticas de citas | Crear endpoint | GET |
-| Estadísticas de clientes | Crear endpoint | GET |
-
----
-
 ## 🔐 **Tabla Resumen de Permisos**
 
-| Funcionalidad | Cliente | Veterinario | Recepcionista | Admin |
-|--------------|---------|-------------|---------------|-------|
+> **Nota:** Solo incluye los 3 roles implementados actualmente
+
+| Funcionalidad | Cliente | Veterinario | Recepcionista |
+|--------------|---------|-------------|---------------|
 | **Mascotas** |
-| Ver sus mascotas | ✅ | ✅ (todas) | ✅ (todas) | ✅ |
-| Registrar mascota | ✅ | ❌ | ✅ | ✅ |
-| Editar mascota | ✅ (solo suyas) | ❌ | ✅ | ✅ |
-| Eliminar mascota | ✅ (solo suyas) | ❌ | ✅ | ✅ |
-| Ver QR de mascota | ✅ | ✅ | ✅ | ✅ |
-| Escanear QR | ✅ | ✅ | ✅ | ✅ |
+| Ver sus mascotas | ✅ | ✅ (todas) | ✅ (todas) |
+| Registrar mascota | ✅ | ❌ | ✅ |
+| Editar mascota | ✅ (solo suyas) | ❌ | ✅ |
+| Eliminar mascota | ✅ (solo suyas) | ❌ | ✅ |
+| Ver QR de mascota | ✅ | ✅ | ✅ |
+| Escanear QR | ✅ | ✅ | ✅ |
 | **Citas** |
-| Ver sus citas | ✅ | ✅ (asignadas) | ✅ (todas) | ✅ |
-| Agendar cita | ✅ | ❌ | ✅ | ✅ |
-| Cancelar cita | ✅ (solo suyas) | ✅ (asignadas) | ✅ | ✅ |
-| Reprogramar cita | ✅ (solo suyas) | ✅ (asignadas) | ✅ | ✅ |
-| Cambiar estado cita | ❌ | ✅ | ✅ | ✅ |
-| Ver disponibilidad | ✅ | ✅ | ✅ | ✅ |
+| Ver sus citas | ✅ | ✅ (asignadas) | ✅ (todas) |
+| Agendar cita | ✅ | ❌ | ✅ |
+| Cancelar cita | ✅ (solo suyas) | ✅ (asignadas) | ✅ |
+| Reprogramar cita | ✅ (solo suyas) | ✅ (asignadas) | ✅ |
+| Cambiar estado cita | ❌ | ✅ | ✅ |
+| Ver disponibilidad | ✅ | ✅ | ✅ |
 | **Historial Médico** |
-| Ver historial | ✅ (solo suyas) | ✅ (todas) | ✅ (todas) | ✅ |
-| Registrar consulta | ❌ | ✅ | ❌ | ✅ |
-| Editar consulta | ❌ | ✅ (solo suyas) | ❌ | ✅ |
-| Adjuntar archivos | ❌ | ✅ | ❌ | ✅ |
+| Ver historial | ✅ (solo suyas) | ✅ (todas) | ✅ (todas) |
+| Registrar consulta | ❌ | ✅ | ❌ |
+| Editar consulta | ❌ | ✅ (solo suyas) | ❌ |
+| Adjuntar archivos | ❌ | ✅ | ❌ |
 | **Facturas** |
-| Ver sus facturas | ✅ | ❌ | ✅ (todas) | ✅ |
-| Crear factura | ❌ | ❌ | ✅ | ✅ |
-| Editar factura | ❌ | ❌ | ✅ | ✅ |
+| Ver sus facturas | ✅ | ❌ | ✅ (todas) |
+| Crear factura | ❌ | ❌ | ✅ |
+| Editar factura | ❌ | ❌ | ✅ |
+| **Facturación desde Historiales** ⭐ |
+| Ver historiales sin facturar | ❌ | ❌ | ✅ |
+| Seleccionar múltiples historiales | ❌ | ❌ | ✅ |
+| Generar factura desde historiales | ❌ | ❌ | ✅ |
 | **Clientes** |
-| Ver clientes | ❌ | ❌ | ✅ | ✅ |
-| Registrar cliente | ❌ | ❌ | ✅ | ✅ |
-| Editar cliente | ❌ | ❌ | ✅ | ✅ |
+| Ver clientes | ❌ | ❌ | ✅ |
+| Registrar cliente (walk-in) | ❌ | ❌ | ✅ |
+| Editar cliente | ❌ | ❌ | ✅ |
 | **Veterinarios** |
-| Ver veterinarios | ✅ | ✅ | ✅ | ✅ |
-| Registrar veterinario | ❌ | ❌ | ❌ | ✅ |
-| Editar veterinario | ❌ | ❌ | ❌ | ✅ |
-| Configurar disponibilidad | ❌ | ✅ (solo propia) | ❌ | ✅ |
+| Ver veterinarios | ✅ | ✅ | ✅ |
+| Registrar veterinario | ❌ | ❌ | ❌ |
+| Editar veterinario | ❌ | ❌ | ❌ |
+| Configurar disponibilidad | ❌ | ✅ (solo propia) | ❌ |
 | **Servicios** |
-| Ver servicios | ✅ | ✅ | ✅ | ✅ |
-| Crear servicio | ❌ | ❌ | ❌ | ✅ |
-| Editar servicio | ❌ | ❌ | ❌ | ✅ |
+| Ver servicios | ✅ | ✅ | ✅ |
+| Crear servicio | ❌ | ❌ | ✅ |
+| Editar servicio | ❌ | ❌ | ✅ |
 | **Sistema** |
-| Ver estadísticas | ❌ | ✅ (propias) | ✅ (básicas) | ✅ |
-| Configurar sistema | ❌ | ❌ | ❌ | ✅ |
-| Gestionar usuarios | ❌ | ❌ | ❌ | ✅ |
-| Enviar notificaciones | ❌ | ❌ | ✅ | ✅ |
+| Ver estadísticas | ❌ | ✅ (propias) | ✅ (básicas) |
+| Enviar notificaciones | ❌ | ❌ | ✅ |
 
 ---
 
@@ -714,7 +600,7 @@ Acceso total al sistema. Gestiona usuarios, veterinarios, servicios, configuraci
 ### **Navegación por Rol:**
 
 ```dart
-// Después del login, redirigir según rol:
+// Después del login, redirigir según rol (solo 3 roles implementados):
 switch (user.tipoUsuario) {
   case 'cliente':
     Navigator.pushReplacementNamed(context, '/cliente/dashboard');
@@ -725,9 +611,9 @@ switch (user.tipoUsuario) {
   case 'recepcion':
     Navigator.pushReplacementNamed(context, '/recepcion/dashboard');
     break;
-  case 'admin':
-    Navigator.pushReplacementNamed(context, '/admin/dashboard');
-    break;
+  default:
+    // Admin no implementado aún
+    Navigator.pushReplacementNamed(context, '/login');
 }
 ```
 
@@ -758,24 +644,14 @@ switch (user.tipoUsuario) {
 #### **Recepcionista:**
 ```
 📱 Dashboard
-📅 Citas
+� Walk-In (Registro Rápido)
+�📅 Citas
 👥 Clientes
 🐾 Mascotas
-💰 Facturas
+💰 Facturas (desde Historiales) ⭐
 🩺 Servicios
-👤 Mi Perfil
-🚪 Cerrar Sesión
-```
-
-#### **Administrador:**
-```
-📱 Dashboard
-👥 Usuarios
-🩺 Veterinarios
-📋 Servicios
-💰 Reportes
-⚙️ Configuración
-🔔 Notificaciones
+� Buscar QR
+� Mi Perfil
 🚪 Cerrar Sesión
 ```
 
@@ -783,29 +659,67 @@ switch (user.tipoUsuario) {
 
 ## ✅ **Checklist de Implementación**
 
-### **Backend (Laravel):**
-- [x] Sistema de roles con Spatie Permission
+### **Backend (Laravel):** ✅ 100% COMPLETO
+
+- [x] Sistema de roles con Spatie Permission (3 roles)
 - [x] Endpoints de mascotas con QR
 - [x] Endpoints de citas con validación
 - [x] Endpoints de disponibilidad de veterinarios
-- [x] Endpoints de historial médico
+- [x] Endpoints de historial médico con servicios
 - [x] Endpoints de facturas
+- [x] **Endpoint facturación desde historiales** ⭐
+- [x] **Sistema Walk-In (clientes sin cuenta)** ⭐
 - [x] Sistema de notificaciones FCM
-- [ ] Middleware de permisos por rol (opcional)
+- [x] Auditoría completa (AuditLog)
+- [x] QR System con lookup
+- [x] 70 API endpoints funcionales
+- [x] 25 migraciones ejecutadas
 
-### **Frontend (Flutter):**
-- [ ] Sistema de login con roles
-- [ ] Dashboard por rol
+### **Frontend (Flutter):** ⏳ PENDIENTE
+
+#### **Prioridad Alta:**
+- [ ] Sistema de login con roles (3 roles)
+- [ ] Dashboard por rol (3 dashboards)
+- [ ] **Pantallas recepcionista:**
+  - [ ] Walk-In registration (wizard 3 pasos)
+  - [ ] **Facturación desde historiales** (tabla + checkboxes) ⭐
+  - [ ] QR scanner integration
 - [ ] Pantallas de gestión de mascotas
 - [ ] Pantallas de gestión de citas
 - [ ] Validación de disponibilidad al agendar
+
+#### **Prioridad Media:**
 - [ ] Pantallas de historial médico
 - [ ] Pantallas de facturas
-- [ ] QR scanner y generator
-- [ ] Sistema de notificaciones push
+- [ ] Sistema de notificaciones push (FCM)
+- [ ] State management (Provider/Riverpod)
+
+#### **Prioridad Baja:**
+- [ ] Pantallas veterinario completas
+- [ ] Pantallas cliente completas
+- [ ] Optimizaciones UI/UX
+- [ ] Testing unitario
 
 ---
 
-**Fecha de creación:** 7 de noviembre de 2025  
+## 📝 Notas Finales
+
+**✅ Backend Status:** 100% completo para 3 roles  
+**⏳ Frontend Status:** Por implementar  
+**🔮 Futuro:** Rol Admin planeado para versión 2.0
+
+**Sistemas Críticos Implementados:**
+- ✅ Walk-In System (clientes sin cuenta)
+- ✅ QR System (identificación única)
+- ✅ Servicios múltiples en historiales
+- ✅ Facturación desde múltiples historiales
+- ✅ Sistema de notificaciones (FCM + DB)
+- ✅ Auditoría completa
+
+---
+
+**Fecha de actualización:** Enero 2025  
 **Backend Version:** Laravel 12.37.0  
+**Roles Implementados:** 3 (Cliente, Veterinario, Recepcionista)  
+**API Endpoints:** 70 rutas funcionales  
 **Sistema:** VetCare - Gestión de Clínica Veterinaria

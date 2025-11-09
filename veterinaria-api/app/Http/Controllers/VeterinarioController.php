@@ -55,6 +55,9 @@ class VeterinarioController extends Controller
         try {
             $veterinario = Veterinario::create($validated);
 
+            // Crear horarios por defecto (Lunes a Viernes, 9:00-18:00, intervalos de 30 min)
+            $this->crearHorariosDefecto($veterinario->id);
+
             // Auditoría
             \App\Models\AuditLog::create([
                 'user_id' => auth()->id(),
@@ -68,7 +71,7 @@ class VeterinarioController extends Controller
 
             return response()->json([
                 'message' => 'Veterinario creado exitosamente',
-                'veterinario' => $veterinario
+                'veterinario' => $veterinario->load('agendasDisponibilidad')
             ], 201);
 
         } catch (\Exception $e) {
@@ -219,11 +222,152 @@ class VeterinarioController extends Controller
     }
 
     /**
-     * Configurar horarios de disponibilidad
+     * Crear horarios por defecto para un veterinario
+     * Lunes a Viernes (1-5), 9:00-18:00, intervalos de 30 minutos
+     */
+    private function crearHorariosDefecto($veterinarioId)
+    {
+        $horariosDefecto = [
+            ['dia_semana' => 1, 'nombre_dia' => 'Lunes'],
+            ['dia_semana' => 2, 'nombre_dia' => 'Martes'],
+            ['dia_semana' => 3, 'nombre_dia' => 'Miércoles'],
+            ['dia_semana' => 4, 'nombre_dia' => 'Jueves'],
+            ['dia_semana' => 5, 'nombre_dia' => 'Viernes'],
+        ];
+
+        foreach ($horariosDefecto as $dia) {
+            AgendaDisponibilidad::create([
+                'veterinario_id' => $veterinarioId,
+                'dia_semana' => $dia['dia_semana'],
+                'hora_inicio' => '09:00',
+                'hora_fin' => '18:00',
+                'intervalo_minutos' => 30,
+                'activo' => true,
+            ]);
+        }
+    }
+
+    /**
+     * Autorizar edición/gestión de horarios
+     * Solo permite a: usuario tipo 'recepcion' o al veterinario dueño (user_id)
+     */
+    private function authorizeEdit($veterinarioId)
+    {
+        $user = auth()->user();
+        if (!$user) {
+            abort(403, 'No autorizado');
+        }
+
+        // Recepción puede editar cualquier horario
+        if (isset($user->tipo_usuario) && $user->tipo_usuario === 'recepcion') {
+            return;
+        }
+
+        // Si es veterinario, solo puede editar su propia agenda
+        if (isset($user->tipo_usuario) && $user->tipo_usuario === 'veterinario') {
+            $miVet = Veterinario::where('user_id', $user->id)->first();
+            if (!$miVet || $miVet->id != $veterinarioId) {
+                abort(403, 'No autorizado para modificar este horario');
+            }
+            return;
+        }
+
+        // Otros tipos no permitidos
+        abort(403, 'No autorizado');
+    }
+
+    /**
+     * Obtener slots de tiempo disponibles u ocupados para un veterinario en una fecha
+     * Devuelve un calendario listo para pintar en el frontend
+     */
+    public function getSlotsDisponibles($id, Request $request)
+    {
+        $veterinario = Veterinario::findOrFail($id);
+
+        // Obtener fecha (por defecto hoy)
+        $fecha = $request->query('fecha', now()->format('Y-m-d'));
+        $diaSemana = \Carbon\Carbon::parse($fecha)->dayOfWeek;
+
+        // Obtener horarios configurados para ese día
+        $agendas = AgendaDisponibilidad::where('veterinario_id', $id)
+            ->where('dia_semana', $diaSemana)
+            ->where('activo', true)
+            ->get();
+
+        if ($agendas->isEmpty()) {
+            return response()->json([
+                'veterinario' => $veterinario->only(['id', 'nombre', 'especialidad']),
+                'fecha' => $fecha,
+                'mensaje' => 'No hay horarios configurados para este día',
+                'slots' => []
+            ]);
+        }
+
+        // Obtener citas ya agendadas para ese día
+        $citas = \App\Models\Cita::where('veterinario_id', $id)
+            ->whereDate('fecha', $fecha)
+            ->whereNotIn('estado', ['cancelada'])
+            ->get();
+
+        // Generar todos los slots posibles
+        $slots = [];
+        foreach ($agendas as $agenda) {
+            $horaActual = \Carbon\Carbon::parse($fecha . ' ' . $agenda->hora_inicio);
+            $horaFin = \Carbon\Carbon::parse($fecha . ' ' . $agenda->hora_fin);
+
+            while ($horaActual->lt($horaFin)) {
+                $slotInicio = $horaActual->copy();
+                $slotFin = $horaActual->copy()->addMinutes($agenda->intervalo_minutos);
+
+                // Verificar si este slot está ocupado por alguna cita
+                $ocupado = false;
+                $citaInfo = null;
+
+                foreach ($citas as $cita) {
+                    $citaInicio = \Carbon\Carbon::parse($cita->fecha);
+                    $citaFin = $citaInicio->copy()->addMinutes($cita->duracion_minutos);
+
+                    // Verificar solapamiento
+                    if ($slotInicio->lt($citaFin) && $slotFin->gt($citaInicio)) {
+                        $ocupado = true;
+                        $citaInfo = [
+                            'id' => $cita->id,
+                            'cliente' => $cita->cliente->nombre ?? 'Sin nombre',
+                            'mascota' => $cita->mascota->nombre ?? 'Sin nombre',
+                            'motivo' => $cita->motivo,
+                            'estado' => $cita->estado,
+                        ];
+                        break;
+                    }
+                }
+
+                $slots[] = [
+                    'hora_inicio' => $slotInicio->format('H:i'),
+                    'hora_fin' => $slotFin->format('H:i'),
+                    'disponible' => !$ocupado,
+                    'cita' => $citaInfo,
+                ];
+
+                $horaActual->addMinutes($agenda->intervalo_minutos);
+            }
+        }
+
+        return response()->json([
+            'veterinario' => $veterinario->only(['id', 'nombre', 'especialidad']),
+            'fecha' => $fecha,
+            'dia_semana' => $diaSemana,
+            'slots' => $slots,
+        ]);
+    }
+
+    /**
+     * Configurar horarios de disponibilidad (REEMPLAZA TODOS)
      */
     public function setDisponibilidad(Request $request, $id)
     {
         $veterinario = Veterinario::findOrFail($id);
+        // Verificar permisos: solo recepción o el propio veterinario pueden cambiar su disponibilidad
+        $this->authorizeEdit($id);
 
         $validated = $request->validate([
             'horarios' => 'required|array',
@@ -262,6 +406,133 @@ class VeterinarioController extends Controller
             DB::rollBack();
             return response()->json([
                 'error' => 'Error al configurar horarios: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Agregar un horario individual sin eliminar los demás
+     */
+    public function addHorario(Request $request, $id)
+    {
+        $veterinario = Veterinario::findOrFail($id);
+        // Verificar permisos: solo recepción o el propio veterinario
+        $this->authorizeEdit($id);
+
+        $validated = $request->validate([
+            'dia_semana' => 'required|integer|between:0,6',
+            'hora_inicio' => 'required|date_format:H:i',
+            'hora_fin' => 'required|date_format:H:i|after:hora_inicio',
+            'intervalo_minutos' => 'required|integer|min:10|max:120',
+            'activo' => 'boolean',
+        ]);
+
+        try {
+            $horario = AgendaDisponibilidad::create([
+                'veterinario_id' => $id,
+                'dia_semana' => $validated['dia_semana'],
+                'hora_inicio' => $validated['hora_inicio'],
+                'hora_fin' => $validated['hora_fin'],
+                'intervalo_minutos' => $validated['intervalo_minutos'],
+                'activo' => $validated['activo'] ?? true,
+            ]);
+
+            return response()->json([
+                'message' => 'Horario agregado exitosamente',
+                'horario' => $horario
+            ], 201);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al agregar horario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Actualizar un horario específico
+     */
+    public function updateHorario(Request $request, $veterinarioId, $horarioId)
+    {
+        // Verificar permisos: solo recepción o el propio veterinario
+        $this->authorizeEdit($veterinarioId);
+
+        $horario = AgendaDisponibilidad::where('veterinario_id', $veterinarioId)
+            ->where('id', $horarioId)
+            ->firstOrFail();
+
+        $validated = $request->validate([
+            'dia_semana' => 'sometimes|integer|between:0,6',
+            'hora_inicio' => 'sometimes|date_format:H:i',
+            'hora_fin' => 'sometimes|date_format:H:i|after:hora_inicio',
+            'intervalo_minutos' => 'sometimes|integer|min:10|max:120',
+            'activo' => 'sometimes|boolean',
+        ]);
+
+        try {
+            $horario->update($validated);
+
+            return response()->json([
+                'message' => 'Horario actualizado exitosamente',
+                'horario' => $horario
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al actualizar horario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Eliminar un horario específico
+     */
+    public function deleteHorario($veterinarioId, $horarioId)
+    {
+        // Verificar permisos: solo recepción o el propio veterinario
+        $this->authorizeEdit($veterinarioId);
+
+        $horario = AgendaDisponibilidad::where('veterinario_id', $veterinarioId)
+            ->where('id', $horarioId)
+            ->firstOrFail();
+
+        try {
+            $horario->delete();
+
+            return response()->json([
+                'message' => 'Horario eliminado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al eliminar horario: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Activar/Desactivar un horario sin eliminarlo
+     */
+    public function toggleHorario($veterinarioId, $horarioId)
+    {
+        // Verificar permisos: solo recepción o el propio veterinario
+        $this->authorizeEdit($veterinarioId);
+
+        $horario = AgendaDisponibilidad::where('veterinario_id', $veterinarioId)
+            ->where('id', $horarioId)
+            ->firstOrFail();
+
+        try {
+            $horario->update(['activo' => !$horario->activo]);
+
+            return response()->json([
+                'message' => $horario->activo ? 'Horario activado' : 'Horario desactivado',
+                'horario' => $horario
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'error' => 'Error al cambiar estado del horario: ' . $e->getMessage()
             ], 500);
         }
     }

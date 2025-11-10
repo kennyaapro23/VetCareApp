@@ -5,7 +5,6 @@ import 'package:vetcare_app/models/appointment_model.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
 import 'citas_screen.dart';
-import 'servicios_screen.dart';
 import 'qr_screen.dart';
 import 'perfil_screen.dart';
 import 'all_patients_screen.dart';

@@ -324,7 +324,13 @@ class _RegisterConsultationScreenState extends State<RegisterConsultationScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Registrar Consulta')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Registrar Consulta'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

@@ -7,6 +7,7 @@ import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:intl/date_symbol_data_local.dart';
+import 'package:vetcare_app/services/api_service.dart';
 
 // Handler para mensajes en background
 @pragma('vm:entry-point')
@@ -20,6 +21,9 @@ void main() async {
 
   // 🌐 Inicializar localización de fechas (español)
   await initializeDateFormatting('es', null);
+
+  // 🔐 Inicializar ApiService para cargar token persistido (si existe)
+  await ApiService().init();
 
   // 🔥 Desactivar descarga de fuentes (evita error de red)
   // GoogleFonts.config.allowRuntimeFetching = false;

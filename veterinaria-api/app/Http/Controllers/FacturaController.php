@@ -46,6 +46,32 @@ class FacturaController extends Controller
             $query->where('numero_factura', 'like', '%' . $request->numero_factura . '%');
         }
 
+        // Filtrar por nombre de cliente (puede venir como cliente asociado a la factura o a la cita)
+        if ($request->has('cliente_nombre')) {
+            $clienteNombre = $request->cliente_nombre;
+            $query->where(function ($q) use ($clienteNombre) {
+                $q->whereHas('cliente', function ($q2) use ($clienteNombre) {
+                    $q2->where('nombre', 'like', '%' . $clienteNombre . '%');
+                })->orWhereHas('cita.cliente', function ($q3) use ($clienteNombre) {
+                    $q3->where('nombre', 'like', '%' . $clienteNombre . '%');
+                });
+            });
+        }
+
+        // Filtrar por nombre de mascota (puede venir por la cita o por historiales asociados)
+        if ($request->has('mascota_nombre')) {
+            $mascotaNombre = $request->mascota_nombre;
+            $query->where(function ($q) use ($mascotaNombre) {
+                $q->whereHas('cita.mascota', function ($q2) use ($mascotaNombre) {
+                    $q2->where('nombre', 'like', '%' . $mascotaNombre . '%');
+                })->orWhereHas('historiales', function ($q3) use ($mascotaNombre) {
+                    $q3->whereHas('mascota', function ($q4) use ($mascotaNombre) {
+                        $q4->where('nombre', 'like', '%' . $mascotaNombre . '%');
+                    });
+                });
+            });
+        }
+
         $facturas = $query->latest('fecha_emision')->paginate(20);
 
         return response()->json($facturas);
@@ -83,6 +109,30 @@ class FacturaController extends Controller
             $impuestos = round($subtotal * 0.16, 2);
             $total = $subtotal + $impuestos;
 
+            // Construir detalles para la factura (servicios, mascota, subtotal por línea)
+            $detalles = [
+                'origen' => 'cita',
+                'cita_id' => $cita->id,
+                'mascota' => $cita->mascota ? [
+                    'id' => $cita->mascota->id,
+                    'nombre' => $cita->mascota->nombre,
+                ] : null,
+                'servicios' => $cita->servicios->map(function ($s) {
+                    $cantidad = $s->pivot->cantidad ?? 1;
+                    $precio = $s->pivot->precio_unitario ?? ($s->precio ?? 0);
+                    return [
+                        'id' => $s->id,
+                        'nombre' => $s->nombre ?? null,
+                        'cantidad' => $cantidad,
+                        'precio_unitario' => (float) $precio,
+                        'subtotal' => round($cantidad * $precio, 2),
+                    ];
+                })->values()->toArray(),
+                'subtotal' => (float) $subtotal,
+                'impuestos' => (float) $impuestos,
+                'total' => (float) $total,
+            ];
+
             $factura = Factura::create([
                 'cita_id' => $cita->id,
                 'numero_factura' => $validated['numero_factura'],
@@ -93,7 +143,13 @@ class FacturaController extends Controller
                 'estado' => 'pendiente',
                 'metodo_pago' => $validated['metodo_pago'] ?? null,
                 'notas' => $validated['notas'] ?? null,
+                'detalles' => $detalles,
             ]);
+
+            // Marcar la cita como completada si corresponde (evita dejarla en pendiente)
+            if ($cita->estado !== 'completada') {
+                $cita->update(['estado' => 'completada']);
+            }
 
             // Auditoría
             \App\Models\AuditLog::create([
@@ -192,10 +248,69 @@ class FacturaController extends Controller
                 'subtotal' => $subtotal,
                 'impuestos' => $impuestos,
                 'total' => $total,
-                'estado' => 'pendiente',
+                // Por defecto al facturar desde historiales, consideramos que ya se paga
+                'estado' => 'pagado',
+                'fecha_pago' => now(),
                 'metodo_pago' => $validated['metodo_pago'] ?? null,
                 'notas' => $validated['notas'] ?? null,
             ]);
+
+            // Construir detalles agrupando cada historial y sus servicios
+            $detalles = [
+                'origen' => 'historiales',
+                'historiales' => [],
+                'subtotal' => (float) $subtotal,
+                'impuestos' => (float) $impuestos,
+                'total' => (float) $total,
+            ];
+
+            foreach ($historiales as $historial) {
+                $servs = $historial->servicios->map(function ($s) {
+                    $cantidad = $s->pivot->cantidad ?? 1;
+                    $precio = $s->pivot->precio_unitario ?? ($s->precio ?? 0);
+                    return [
+                        'id' => $s->id,
+                        'nombre' => $s->nombre ?? null,
+                        'cantidad' => $cantidad,
+                        'precio_unitario' => (float) $precio,
+                        'subtotal' => round($cantidad * $precio, 2),
+                    ];
+                })->values()->toArray();
+
+                $detalles['historiales'][] = [
+                    'historial_id' => $historial->id,
+                    'cita_id' => $historial->cita_id,
+                    'id_cita' => $historial->cita_id,
+                    'fecha' => $historial->fecha ? $historial->fecha->toDateString() : null,
+                    'mascota' => $historial->mascota ? [
+                        'id' => $historial->mascota->id,
+                        'nombre' => $historial->mascota->nombre,
+                    ] : null,
+                    'servicios' => $servs,
+                    'subtotal' => (float) ($historialSubtotales[$historial->id] ?? 0),
+                ];
+            }
+
+            // Guardar detalles JSON en la factura
+            $factura->detalles = $detalles;
+            $factura->save();
+
+            // Si la factura fue creada a partir de un único historial, enlazar la factura a la cita asociada
+            // así la factura queda referenciada por cita (útil para vistas y permisos)
+            if ($historiales->count() === 1) {
+                $single = $historiales->first();
+                if ($single && $single->cita_id) {
+                    $factura->cita_id = $single->cita_id;
+                    // agregar la referencia de cita al detalle principal también
+                    $det = $factura->detalles;
+                    if (is_array($det)) {
+                        $det['cita_id'] = $single->cita_id;
+                        $det['id_cita'] = $single->cita_id;
+                        $factura->detalles = $det;
+                    }
+                    $factura->save();
+                }
+            }
 
             // Adjuntar historiales a la factura con sus subtotales
             $pivotData = [];
@@ -213,6 +328,22 @@ class FacturaController extends Controller
                     'facturado' => true,
                     'factura_id' => $factura->id,
                 ]);
+
+            // Actualizar el estado de las citas relacionadas: si todas sus historiales están facturados,
+            // marcar la cita como 'completada'. Esto evita dejar citas en 'pendiente' después de facturar.
+            $citaIds = $historiales->pluck('cita_id')->unique()->filter();
+            foreach ($citaIds as $citaId) {
+                if (!$citaId) continue;
+
+                $tienePendientes = \App\Models\HistorialMedico::where('cita_id', $citaId)
+                    ->where(function ($q) {
+                        $q->whereNull('facturado')->orWhere('facturado', false);
+                    })->exists();
+
+                if (!$tienePendientes) {
+                    \App\Models\Cita::where('id', $citaId)->update(['estado' => 'completada']);
+                }
+            }
 
             // Auditoría
             \App\Models\AuditLog::create([
@@ -251,7 +382,9 @@ class FacturaController extends Controller
             'cita.mascota',
             'cita.cliente.user',
             'cita.veterinario.user',
-            'cita.servicios'
+            'cita.servicios',
+            'historiales.servicios',
+            'cliente'
         ])->findOrFail($id);
 
         // Verificar permisos

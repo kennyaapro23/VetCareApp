@@ -800,7 +800,13 @@ class _AppointmentFormScreenState extends State<_AppointmentFormScreen> {
     final isDark = Theme.of(context).brightness == Brightness.dark;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Nueva Cita')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
+        title: const Text('Nueva Cita'),
+      ),
       body: _isLoadingData
           ? const Center(child: CircularProgressIndicator())
           : Form(

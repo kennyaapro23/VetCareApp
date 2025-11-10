@@ -210,6 +210,14 @@ class _CreateMedicalRecordScreenState extends State<CreateMedicalRecordScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
         title: const Text('Nuevo Historial Médico'),
         actions: [
           if (_saving)

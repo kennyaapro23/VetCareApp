@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:vetcare_app/models/client_model.dart';
 import 'package:vetcare_app/services/api_service.dart';
 
@@ -7,29 +8,74 @@ class ClientService {
   ClientService(this._api);
 
   Future<List<ClientModel>> getClients() async {
-    final resp = await _api.get<List<dynamic>>(
+    debugPrint('📋 Obteniendo lista de clientes...');
+    final resp = await _api.get<dynamic>(
       'clientes',
-      (json) => (json is List) ? json : [],
+      (json) => json,
     );
-    return resp.map((e) => ClientModel.fromJson(e)).toList();
+    
+    // Detectar si es respuesta paginada o array directo
+    List<dynamic> dataList;
+    if (resp is Map && resp.containsKey('data')) {
+      dataList = (resp['data'] is List) ? resp['data'] : [];
+      debugPrint('📨 Respuesta paginada detectada: ${dataList.length} clientes');
+    } else if (resp is List) {
+      dataList = resp;
+      debugPrint('📨 Respuesta directa detectada: ${dataList.length} clientes');
+    } else {
+      debugPrint('⚠️ Respuesta inesperada: ${resp.runtimeType}');
+      dataList = [];
+    }
+    
+    final clients = dataList.map((e) => ClientModel.fromJson(e)).toList();
+    debugPrint('✅ Clientes parseados: ${clients.length}');
+    return clients;
   }
 
   /// Obtener solo clientes walk-in (sin cuenta)
   Future<List<ClientModel>> getClientesWalkIn() async {
-    final resp = await _api.get<List<dynamic>>(
+    debugPrint('📋 Obteniendo clientes walk-in...');
+    final resp = await _api.get<dynamic>(
       'clientes?es_walk_in=true',
-      (json) => (json is List) ? json : [],
+      (json) => json,
     );
-    return resp.map((e) => ClientModel.fromJson(e)).toList();
+    
+    // Detectar si es respuesta paginada o array directo
+    List<dynamic> dataList;
+    if (resp is Map && resp.containsKey('data')) {
+      dataList = (resp['data'] is List) ? resp['data'] : [];
+      debugPrint('📨 Respuesta paginada: ${dataList.length} clientes walk-in');
+    } else if (resp is List) {
+      dataList = resp;
+      debugPrint('📨 Respuesta directa: ${dataList.length} clientes walk-in');
+    } else {
+      dataList = [];
+    }
+    
+    return dataList.map((e) => ClientModel.fromJson(e)).toList();
   }
 
   /// Obtener solo clientes con cuenta registrada
   Future<List<ClientModel>> getClientesConCuenta() async {
-    final resp = await _api.get<List<dynamic>>(
+    debugPrint('📋 Obteniendo clientes con cuenta...');
+    final resp = await _api.get<dynamic>(
       'clientes?es_walk_in=false',
-      (json) => (json is List) ? json : [],
+      (json) => json,
     );
-    return resp.map((e) => ClientModel.fromJson(e)).toList();
+    
+    // Detectar si es respuesta paginada o array directo
+    List<dynamic> dataList;
+    if (resp is Map && resp.containsKey('data')) {
+      dataList = (resp['data'] is List) ? resp['data'] : [];
+      debugPrint('📨 Respuesta paginada: ${dataList.length} clientes con cuenta');
+    } else if (resp is List) {
+      dataList = resp;
+      debugPrint('📨 Respuesta directa: ${dataList.length} clientes con cuenta');
+    } else {
+      dataList = [];
+    }
+    
+    return dataList.map((e) => ClientModel.fromJson(e)).toList();
   }
 
   Future<ClientModel> getClient(String id) async {

@@ -3,9 +3,11 @@ import 'package:provider/provider.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/models/appointment_model.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
+import 'package:vetcare_app/services/pet_service.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';
 import 'calendar_appointment_screen.dart';
+import 'create_medical_record_screen.dart';
 import 'package:go_router/go_router.dart';
 
 class CitasScreen extends StatefulWidget {
@@ -95,11 +97,31 @@ class _CitasScreenState extends State<CitasScreen> {
   @override
   Widget build(BuildContext context) {
     final isDark = Theme.of(context).brightness == Brightness.dark;
+    final auth = Provider.of<AuthProvider>(context, listen: false);
+    final esVet = auth.user?.esVeterinario ?? false;
 
     return Scaffold(
       body: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildFilters(isDark),
+          const SizedBox(height: 32),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text(
+              'Mis Citas',
+              style: TextStyle(
+                fontSize: 24,
+                fontWeight: FontWeight.bold,
+                color: isDark ? AppTheme.textLight : AppTheme.primaryColor,
+              ),
+            ),
+          ),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 8),
+            child: _buildFilters(isDark),
+          ),
+          const SizedBox(height: 8),
           Expanded(
             child: _loading
                 ? const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor))
@@ -242,6 +264,14 @@ class _AppointmentCard extends StatelessWidget {
     if (appointment.status == 'atendida') statusColor = AppTheme.successColor;
     if (appointment.status == 'cancelada') statusColor = AppTheme.errorColor;
 
+    // Obtener nombre de cliente y mascota si existen
+  // Mostrar IDs si no hay objetos
+    // Si tienes el nombre de la mascota y veterinario, muéstralo. Si no, muestra texto genérico.
+    String mascotaNombre = appointment.mascotaNombre ?? '';
+    String veterinarioNombre = '';
+  final auth = Provider.of<AuthProvider>(context, listen: false);
+  final esVet = auth.user?.esVeterinario ?? false;
+
     return InkWell(
       onTap: () => _navigateToPetProfile(context),
       borderRadius: BorderRadius.circular(12),
@@ -257,83 +287,137 @@ class _AppointmentCard extends StatelessWidget {
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withValues(alpha: 0.2),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    appointment.status ?? 'Sin estado',
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: statusColor.withValues(alpha: 0.2),
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      appointment.status ?? 'Sin estado',
+                      style: TextStyle(
+                        color: statusColor,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ),
-                ),
-                const Spacer(),
-                if (appointment.status == 'pendiente')
-                  IconButton(
-                    icon: const Icon(Icons.cancel_outlined),
-                    color: AppTheme.errorColor,
-                    onPressed: onCancel,
-                    tooltip: 'Cancelar cita',
+                  const Spacer(),
+                  if (appointment.status == 'pendiente')
+                    IconButton(
+                      icon: const Icon(Icons.cancel_outlined),
+                      color: AppTheme.errorColor,
+                      onPressed: onCancel,
+                      tooltip: 'Cancelar cita',
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Mostrar nombre de mascota
+              Row(
+                children: [
+                  const Icon(Icons.pets, size: 16, color: AppTheme.primaryColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    mascotaNombre.isNotEmpty ? 'Mascota: $mascotaNombre' : 'Mascota',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
                   ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Row(
-              children: [
-                Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
-                const SizedBox(width: 8),
-                Text(
-                  dateStr,
-                  style: const TextStyle(fontWeight: FontWeight.w600),
-                ),
-              ],
-            ),
-            if (appointment.reason != null) ...[
+                ],
+              ),
               const SizedBox(height: 8),
               Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Icon(Icons.notes, size: 16, color: AppTheme.textSecondary),
+                  Icon(Icons.calendar_today, size: 16, color: AppTheme.primaryColor),
                   const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      appointment.reason!,
-                      style: TextStyle(
-                        color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                  Text(
+                    dateStr,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                ],
+              ),
+              if (appointment.reason != null) ...[
+                const SizedBox(height: 8),
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Icon(Icons.notes, size: 16, color: AppTheme.textSecondary),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        appointment.reason!,
+                        style: TextStyle(
+                          color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                        ),
                       ),
+                    ),
+                  ],
+                ),
+              ],
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  const Icon(Icons.touch_app, size: 14, color: AppTheme.primaryColor),
+                  const SizedBox(width: 4),
+                  Text(
+                    'Toca para ver perfil de la mascota',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.primaryColor,
+                      fontStyle: FontStyle.italic,
                     ),
                   ),
                 ],
               ),
-            ],
-            const SizedBox(height: 8),
-            Row(
-              children: [
-                const Icon(Icons.touch_app, size: 14, color: AppTheme.primaryColor),
-                const SizedBox(width: 4),
-                Text(
-                  'Toca para ver perfil de la mascota',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: AppTheme.primaryColor,
-                    fontStyle: FontStyle.italic,
+              const SizedBox(height: 12),
+              // Mostrar botón solo si la cita no está atendida y el usuario es veterinario
+              if (appointment.status != 'atendida' && esVet)
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    icon: const Icon(Icons.medical_services),
+                    label: const Text('Crear Historial Médico'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppTheme.primaryColor,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 10),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                    onPressed: () async {
+                      // Buscar la mascota por ID antes de abrir el formulario
+                      try {
+                        final api = Provider.of<AuthProvider>(context, listen: false).api;
+                        final petService = PetService(api);
+                        final pet = await petService.getPet(appointment.petId);
+                        await Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => CreateMedicalRecordScreen(
+                              pet: pet,
+                              citaId: int.tryParse(appointment.id),
+                            ),
+                          ),
+                        );
+                      } catch (e) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text('No se puede crear historial: mascota no encontrada (ID: ${appointment.petId})'),
+                            backgroundColor: AppTheme.errorColor,
+                          ),
+                        );
+                      }
+                    },
                   ),
                 ),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
-    ),
     );
   }
 }

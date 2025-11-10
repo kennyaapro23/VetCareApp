@@ -1,6 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:provider/provider.dart';
-import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'feed_screen.dart';
 import 'citas_screen.dart';

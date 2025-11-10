@@ -5,6 +5,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:vetcare_app/config/app_config.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class ApiException implements Exception {
   final int? statusCode;
@@ -31,8 +32,24 @@ class ApiService {
     debugPrint('🔗 ApiService.baseUrl = ${this.baseUrl}');
   }
 
-  void setToken(String token) => _token = token;
-  void clearToken() => _token = null;
+  void setToken(String token) async {
+    _token = token;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString('auth_token', token);
+  }
+  void clearToken() async {
+    _token = null;
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.remove('auth_token');
+  }
+
+  Future<void> init() async {
+    final prefs = await SharedPreferences.getInstance();
+    final token = prefs.getString('auth_token');
+    if (token != null) {
+      _token = token;
+    }
+  }
 
   Map<String, String> _headers({bool jsonContent = true}) {
     final headers = <String, String>{'Accept': 'application/json'};

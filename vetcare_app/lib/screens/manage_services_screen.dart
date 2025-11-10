@@ -167,6 +167,10 @@ class _ManageServicesScreenState extends State<ManageServicesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Servicios'),
       ),
       body: _isLoading

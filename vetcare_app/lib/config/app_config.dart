@@ -6,7 +6,7 @@ class AppConfig {
   // ANTES de ejecutar la app, ejecuta este comando:
   // C:\Users\kenny\AppData\Local\Android\sdk\platform-tools\adb.exe reverse tcp:8000 tcp:8000
   // O usa el archivo start_dev.bat incluido en el proyecto
-  static const String baseUrl = 'http://127.0.0.1:8000/api/';
+  static const String baseUrl = 'http://192.168.100.42:8000/api/';
 
   // Nota: Se intentó usar IP local (192.168.1.45) pero no funcionó
   // a pesar de configurar el firewall. El método adb reverse es más confiable.

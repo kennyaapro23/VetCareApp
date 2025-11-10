@@ -76,6 +76,10 @@ class _NotificacionesScreenState extends State<NotificacionesScreen> {
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const Text('Notificaciones'),
         actions: [
           IconButton(onPressed: _loadNotifications, icon: const Icon(Icons.refresh)),

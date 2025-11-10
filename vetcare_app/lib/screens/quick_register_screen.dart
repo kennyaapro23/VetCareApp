@@ -94,6 +94,29 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
 
+        // Mostrar SnackBar de confirmación
+        final clienteName = response['cliente']['nombre'];
+        final petName = response['mascota']['nombre'];
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Row(
+              children: [
+                const Icon(Icons.check_circle, color: Colors.white),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    '¡Registro exitoso! Cliente: $clienteName - Mascota: $petName',
+                    style: const TextStyle(fontSize: 14),
+                  ),
+                ),
+              ],
+            ),
+            backgroundColor: AppTheme.successColor,
+            duration: const Duration(seconds: 4),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+
         // Mostrar dialog con QR code
         await _showSuccessDialog(response);
 
@@ -117,7 +140,7 @@ class _QuickRegisterScreenState extends State<QuickRegisterScreen> {
     final cliente = response['cliente'];
     final mascota = response['mascota'];
     final qrCode = response['qr_code'];
-    final qrUrl = response['qr_url'];
+    // final qrUrl = response['qr_url']; // No usado por ahora
 
     return showDialog(
       context: context,

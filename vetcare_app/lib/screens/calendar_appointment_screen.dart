@@ -28,7 +28,9 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
   VeterinarianModel? _selectedVet;
   String? _selectedTimeSlot;
   PetModel? _selectedPet;
-  List<int> _selectedServicios = []; // IDs de servicios seleccionados
+  List<String> _bookedSlots = []; // Horarios ya reservados (formato HH:mm)
+  // Días sin disponibilidad (formato 'yyyy-MM-dd')
+  Set<String> _unavailableDays = {};
 
   List<VeterinarianModel> _veterinarians = [];
   List<PetModel> _pets = [];
@@ -120,6 +122,12 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
           _disponibilidad = disp;
           _isLoading = false;
         });
+          // Si ya hay un día seleccionado, cargar también los horarios reservados para ese día
+          if (_selectedDay != null) {
+            _loadBookedSlots(vetId, _selectedDay!);
+          }
+          // Calcular días sin disponibilidad para el calendario
+          _computeUnavailableDays(vetId);
       }
     } catch (e) {
       if (mounted) {
@@ -189,6 +197,93 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
       _availableSlots = slots;
       _isLoadingSlots = false;
     });
+    // Also load booked slots for this vet/day so occupied slots are marked red
+    if (_selectedVet != null) {
+      _loadBookedSlots(_selectedVet!.id, day);
+    }
+  }
+
+  Future<void> _loadBookedSlots(String vetId, DateTime day) async {
+    try {
+      final auth = context.read<AuthProvider>();
+      final service = AppointmentService(auth.api);
+      final all = await service.getAppointments();
+      final format = DateFormat('HH:mm');
+      final booked = <String>[];
+
+      for (final a in all) {
+        if (a.veterinarianId == vetId && a.date != null) {
+          // Solo considerar citas del mismo día y que no estén canceladas
+          if (isSameDay(a.date, day) && (a.status == null || a.status != 'cancelada')) {
+            booked.add(format.format(a.date!));
+          }
+        }
+      }
+
+      if (mounted) {
+        setState(() => _bookedSlots = booked);
+      }
+    } catch (e) {
+      debugPrint('Error cargando citas reservadas: $e');
+    }
+  }
+
+  // Compute days without availability (used to mark calendar dates as unavailable/red).
+  void _computeUnavailableDays(String vetId) {
+    final out = <String>{};
+    final now = DateTime.now();
+    final daysToCheck = 60; // same range as calendar
+    final weekdayMap = {
+      1: 'lunes',
+      2: 'martes',
+      3: 'miércoles',
+      4: 'jueves',
+      5: 'viernes',
+      6: 'sábado',
+      7: 'domingo',
+    };
+
+    for (var i = 0; i <= daysToCheck; i++) {
+      final day = DateTime(now.year, now.month, now.day).add(Duration(days: i));
+      final dayName = weekdayMap[day.weekday];
+      final dayDisp = _disponibilidad.where((d) => d.diaSemana?.toLowerCase() == dayName).toList();
+
+      bool hasAvailable = false;
+      if (dayDisp.isNotEmpty) {
+        for (var disp in dayDisp) {
+          if (disp.horaInicio != null && disp.horaFin != null) {
+            try {
+              final startParts = disp.horaInicio!.split(':');
+              final endParts = disp.horaFin!.split(':');
+              final startHour = int.parse(startParts[0]);
+              final startMin = int.parse(startParts[1]);
+              final endHour = int.parse(endParts[0]);
+              final endMin = int.parse(endParts[1]);
+
+              var currentTime = DateTime(day.year, day.month, day.day, startHour, startMin);
+              final endTime = DateTime(day.year, day.month, day.day, endHour, endMin);
+
+              while (currentTime.isBefore(endTime)) {
+                if (currentTime.isAfter(now)) {
+                  hasAvailable = true;
+                  break;
+                }
+                currentTime = currentTime.add(const Duration(minutes: 30));
+              }
+            } catch (_) {
+              // ignore parse errors
+            }
+            if (hasAvailable) break;
+          }
+        }
+      }
+
+      if (!hasAvailable) {
+        out.add('${day.year.toString().padLeft(4,'0')}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}');
+      }
+    }
+
+    setState(() => _unavailableDays = out);
   }
 
   Future<void> _confirmAppointment() async {
@@ -240,10 +335,7 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
         if (_motivoController.text.trim().isNotEmpty) 'motivo': _motivoController.text.trim(),
       };
 
-      // Enviar servicios como lista de IDs (si hay) — el backend acepta null/omitir si no hay.
-      if (_selectedServicios.isNotEmpty) {
-        data['servicios'] = _selectedServicios;
-      }
+      // Nota: no enviamos servicios desde este flujo (el backend no los requiere aquí).
 
       await service.createAppointment(data);
 
@@ -261,7 +353,6 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
           _selectedTimeSlot = null;
           _selectedVet = null;
           _selectedPet = null;
-          _selectedServicios.clear();
           _availableSlots = [];
           _motivoController.clear();
         });
@@ -353,13 +444,9 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
                         ),
 
                         const SizedBox(height: 24),
-
-                        // Paso 6: Servicios
-                        _buildSectionTitle('6. Servicios (opcional)', Icons.medical_services),
-                        const SizedBox(height: 8),
-                        _buildServiciosSelector(isDark),
-
-                        const SizedBox(height: 24),
+                        // Nota: se removió el selector de servicios del flujo de agendamiento
+                        // porque el backend no almacena servicios opcionales en este endpoint.
+                        const SizedBox(height: 0),
 
                         // Botón confirmar
                         SizedBox(
@@ -583,10 +670,31 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
             color: AppTheme.primaryColor.withValues(alpha: 0.3),
             shape: BoxShape.circle,
           ),
+          // Disabled days (unavailable) will be rendered with an error tint
+          disabledDecoration: BoxDecoration(
+            color: AppTheme.errorColor.withValues(alpha: 0.12),
+            shape: BoxShape.circle,
+          ),
+          disabledTextStyle: TextStyle(
+            color: AppTheme.errorColor,
+            fontWeight: FontWeight.w700,
+          ),
           weekendTextStyle: TextStyle(
             color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
           ),
         ),
+        // Disable days that are unavailable according to computed set, or are in the past
+        enabledDayPredicate: (day) {
+          final key = '${day.year.toString().padLeft(4,'0')}-${day.month.toString().padLeft(2,'0')}-${day.day.toString().padLeft(2,'0')}';
+          final today = DateTime.now();
+          final dayOnly = DateTime(day.year, day.month, day.day);
+          final todayOnly = DateTime(today.year, today.month, today.day);
+          // disable past days
+          if (dayOnly.isBefore(todayOnly)) return false;
+          // disable days marked as unavailable
+          if (_unavailableDays.contains(key)) return false;
+          return true;
+        },
         onDaySelected: (selectedDay, focusedDay) {
           if (selectedDay.isBefore(DateTime.now().subtract(const Duration(days: 1)))) {
             return;
@@ -640,30 +748,48 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
         runSpacing: 8,
         children: _availableSlots.map((slot) {
           final isSelected = _selectedTimeSlot == slot;
+          final isBooked = _bookedSlots.contains(slot);
           return InkWell(
-            onTap: () {
-              setState(() {
-                _selectedTimeSlot = slot;
-              });
-            },
+            onTap: isBooked
+                ? null
+                : () {
+                    setState(() {
+                      _selectedTimeSlot = slot;
+                    });
+                  },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
                 color: isSelected
                     ? AppTheme.primaryColor
-                    : (isDark ? AppTheme.darkSurface : AppTheme.lightSurface),
+                    : isBooked
+                        ? AppTheme.errorColor.withValues(alpha: 0.12)
+                        : (isDark ? AppTheme.darkSurface : AppTheme.lightSurface),
                 borderRadius: BorderRadius.circular(8),
                 border: Border.all(
-                  color: isSelected ? AppTheme.primaryColor : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+                  color: isSelected
+                      ? AppTheme.primaryColor
+                      : isBooked
+                          ? AppTheme.errorColor
+                          : (isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
                   width: 2,
                 ),
               ),
-              child: Text(
-                slot,
-                style: TextStyle(
-                  fontWeight: FontWeight.w600,
-                  color: isSelected ? Colors.white : null,
-                ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    slot,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: isSelected ? Colors.white : (isBooked ? AppTheme.errorColor : null),
+                    ),
+                  ),
+                  if (isBooked) ...[
+                    const SizedBox(width: 8),
+                    Icon(Icons.lock, size: 14, color: AppTheme.errorColor),
+                  ],
+                ],
               ),
             ),
           );
@@ -672,83 +798,6 @@ class _CalendarAppointmentScreenState extends State<CalendarAppointmentScreen> {
     );
   }
 
-  Widget _buildServiciosSelector(bool isDark) {
-    if (_servicios.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: isDark ? AppTheme.darkCard : Colors.white,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-          ),
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.info_outline, size: 48, color: AppTheme.textSecondary),
-            const SizedBox(height: 8),
-            const Text(
-              'No hay servicios disponibles',
-              style: TextStyle(color: AppTheme.textSecondary),
-            ),
-            const SizedBox(height: 4),
-            const Text(
-              'Los servicios deben ser creados por el administrador',
-              style: TextStyle(fontSize: 12, color: AppTheme.textSecondary),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 12),
-            TextButton.icon(
-              onPressed: _loadServicios,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Reintentar'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: isDark ? AppTheme.darkCard : Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: _servicios.map((servicio) {
-          final isSelected = _selectedServicios.contains(servicio.id);
-          return CheckboxListTile(
-            value: isSelected,
-            onChanged: (value) {
-              setState(() {
-                if (value == true) {
-                  _selectedServicios.add(servicio.id);
-                } else {
-                  _selectedServicios.remove(servicio.id);
-                }
-              });
-            },
-            title: Text(
-              servicio.nombre,
-              style: const TextStyle(fontWeight: FontWeight.w500),
-            ),
-            subtitle: Text(
-              '${servicio.tipo} - \$${servicio.precio.toStringAsFixed(2)}',
-              style: TextStyle(
-                fontSize: 12,
-                color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
-              ),
-            ),
-            activeColor: AppTheme.primaryColor,
-            dense: true,
-          );
-        }).toList(),
-      ),
-    );
-  }
+  // Servicios selector removed from this flow (not used).
 }
 

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/services/historial_medico_service.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
@@ -11,6 +12,8 @@ import 'package:intl/intl.dart';
 import 'package:qr_flutter/qr_flutter.dart';
 import 'add_pet_screen.dart';
 import 'create_medical_record_screen.dart';
+import 'manage_invoices_screen.dart';
+import 'historial_detail_screen.dart';
 
 class PetDetailScreen extends StatefulWidget {
   final PetModel pet;
@@ -94,6 +97,10 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
 
     return Scaffold(
       appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => context.go('/home'),
+        ),
         title: Text(widget.pet.name),
         actions: [
           PopupMenuButton(
@@ -417,6 +424,10 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
   }
 
   Widget _buildHistorialTab(bool isDark) {
+    final auth = context.read<AuthProvider>();
+    final userRole = auth.user?.role.toLowerCase().trim() ?? 'cliente';
+    final isReception = userRole == 'recepcion' || userRole.contains('recep');
+    
     if (_isLoading) {
       return const Center(child: CircularProgressIndicator(color: AppTheme.primaryColor));
     }
@@ -439,15 +450,22 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
         // Filtros de fecha
         Padding(
           padding: const EdgeInsets.all(16),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              _buildFiltroChip('Todos', 'todos', isDark),
-              _buildFiltroChip('Último mes', 'mes', isDark),
-              _buildFiltroChip('3 últimos meses', 'tres_meses', isDark),
-              _buildFiltroChip('Año actual', 'anio', isDark),
-              _buildFiltroChip('Personalizado', 'personalizado', isDark),
-            ],
+          child: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                _buildFiltroChip('Todos', 'todos', isDark),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Último mes', 'mes', isDark),
+                const SizedBox(width: 8),
+                _buildFiltroChip('3 últimos meses', 'tres_meses', isDark),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Año actual', 'anio', isDark),
+                const SizedBox(width: 8),
+                _buildFiltroChip('Personalizado', 'personalizado', isDark),
+              ],
+            ),
           ),
         ),
         Expanded(
@@ -456,85 +474,130 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
             itemCount: _historial.length,
             itemBuilder: (context, index) {
               final registro = _historial[index];
-              return Container(
-                margin: const EdgeInsets.only(bottom: 12),
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: isDark ? AppTheme.darkCard : Colors.white,
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
-                  ),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Icon(_getIconForTipo(registro.tipo), size: 20, color: AppTheme.primaryColor),
-                        const SizedBox(width: 8),
-                        Text(
-                          registro.tipo.toUpperCase(),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppTheme.primaryColor,
-                          ),
-                        ),
-                        const Spacer(),
-                        // Mostrar número de servicios y total si existen
-                        if (registro.servicios.isNotEmpty) ...[
-                          GestureDetector(
-                            onTap: () => _showServiciosDialog(registro),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: AppTheme.secondaryColor.withValues(alpha: 0.08),
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.15)),
-                              ),
-                              child: Row(
-                                children: [
-                                  const Icon(Icons.local_hospital, size: 14, color: AppTheme.secondaryColor),
-                                  const SizedBox(width: 6),
-                                  Text('Servicios: ${registro.servicios.length}', style: const TextStyle(fontSize: 12)),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    NumberFormat.simpleCurrency(locale: 'es').format(registro.totalServicios),
-                                    style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.secondaryColor),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
-                        ] else ...[
-                          Text(
-                            DateFormat('dd/MM/yyyy').format(registro.fecha),
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
-                            ),
-                          ),
-                        ],
-                      ],
+              return GestureDetector(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => HistorialDetailScreen(historial: registro),
                     ),
-                    if (registro.diagnostico != null) ...[
-                      const SizedBox(height: 8),
-                      Text(
-                        registro.diagnostico!,
-                        style: const TextStyle(fontWeight: FontWeight.w600),
+                  );
+                },
+                child: Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: isDark ? AppTheme.darkCard : Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder,
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(_getIconForTipo(registro.tipo), size: 20, color: AppTheme.primaryColor),
+                          const SizedBox(width: 8),
+                          Text(
+                            registro.tipo.toUpperCase(),
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.primaryColor,
+                            ),
+                          ),
+                          const Spacer(),
+                          if (registro.servicios.isNotEmpty) ...[
+                            GestureDetector(
+                              onTap: () => _showServiciosDialog(registro),
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppTheme.secondaryColor.withValues(alpha: 0.08),
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: AppTheme.secondaryColor.withValues(alpha: 0.15)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.local_hospital, size: 14, color: AppTheme.secondaryColor),
+                                    const SizedBox(width: 6),
+                                    Text('Servicios: ${registro.servicios.length}', style: const TextStyle(fontSize: 12)),
+                                    const SizedBox(width: 8),
+                                    Text(
+                                      NumberFormat.simpleCurrency(locale: 'es').format(registro.totalServicios),
+                                      style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: AppTheme.secondaryColor),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ] else ...[
+                            Text(
+                              DateFormat('dd/MM/yyyy').format(registro.fecha),
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
-                    ],
-                    if (registro.tratamiento != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        registro.tratamiento!,
-                        style: TextStyle(
-                          color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                      if (registro.diagnostico != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          registro.diagnostico!,
+                          style: const TextStyle(fontWeight: FontWeight.w600),
                         ),
-                      ),
+                      ],
+                      if (registro.tratamiento != null) ...[
+                        const SizedBox(height: 4),
+                        Text(
+                          registro.tratamiento!,
+                          style: TextStyle(
+                            color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                          ),
+                        ),
+                      ],
+                      if (!registro.facturado && isReception) ...[
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton.icon(
+                            onPressed: () => _generarFacturaDesdeHistorial(registro),
+                            icon: const Icon(Icons.receipt_long, size: 18),
+                            label: const Text('Generar Factura'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: AppTheme.accentColor,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 12),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                      if (registro.facturado) ...[
+                        const SizedBox(height: 8),
+                        Row(
+                          children: [
+                            Icon(Icons.check_circle, size: 16, color: Colors.green[600]),
+                            const SizedBox(width: 6),
+                            Text(
+                              'Facturado',
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.green[600],
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               );
             },
@@ -593,6 +656,35 @@ class _PetDetailScreenState extends State<PetDetailScreen> with SingleTickerProv
         ],
       ),
     );
+  }
+
+  // Método para generar factura desde historial médico
+  Future<void> _generarFacturaDesdeHistorial(HistorialMedico registro) async {
+    debugPrint('🧾 Generando factura para historial médico ID: ${registro.id}');
+    debugPrint('🐾 Mascota: ${widget.pet.name}');
+    debugPrint('👤 Cliente ID: ${widget.pet.clientId}');
+    
+    // Navegar al formulario de factura con datos pre-llenados
+    // Evitar buscar ApiService directamente en el contexto (puede no estar en el scope).
+    // Usar AuthProvider que ya está disponible en este contexto y expone `api`.
+    final auth = context.read<AuthProvider>();
+    final apiService = auth.api;
+    final result = await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ManageInvoicesScreen(
+          prefilledClientId: widget.pet.clientId,
+          prefilledHistorial: registro,
+          openFormDirectly: true,
+          apiService: apiService,
+        ),
+      ),
+    );
+    
+    // Si se creó la factura exitosamente, recargar datos
+    if (result == true) {
+      _loadData();
+    }
   }
 
   Widget _buildCitasTab(bool isDark) {

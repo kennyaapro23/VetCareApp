@@ -142,6 +142,19 @@ class HistorialController extends Controller
                 'observaciones' => $validated['observaciones'] ?? null,
                 'realizado_por' => $veterinario->id,
             ]);
+            
+            // Si se proporcionó cita_id, validar que la cita corresponda a la mascota indicada
+            if (!empty($validated['cita_id'])) {
+                $cita = \App\Models\Cita::find($validated['cita_id']);
+                if (!$cita) {
+                    DB::rollBack();
+                    return response()->json(['error' => 'Cita especificada no encontrada'], 422);
+                }
+                if ($cita->mascota_id != $validated['mascota_id']) {
+                    DB::rollBack();
+                    return response()->json(['error' => 'La cita especificada no corresponde a la mascota indicada'], 422);
+                }
+            }
 
             // Adjuntar servicios al historial
             if (!empty($validated['servicios'])) {
@@ -159,6 +172,17 @@ class HistorialController extends Controller
                 }
                 
                 $historial->servicios()->attach($serviciosData);
+            }
+
+            // Si se proporcionó cita_id, marcar la cita como atendida
+            if (!empty($validated['cita_id'])) {
+                $citaToMark = \App\Models\Cita::find($validated['cita_id']);
+                if ($citaToMark) {
+                    // Actualizar solo si el estado no es ya 'atendida'
+                    if ($citaToMark->estado !== 'atendida') {
+                        $citaToMark->update(['estado' => 'atendida']);
+                    }
+                }
             }
 
             // archivos handling removed: uploads are not supported

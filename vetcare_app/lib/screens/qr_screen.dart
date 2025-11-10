@@ -626,9 +626,7 @@ class _QRScreenState extends State<QRScreen> {
                       ),
                     ),
                     Text(
-                      record.fecha != null
-                          ? '${record.fecha!.day}/${record.fecha!.month}/${record.fecha!.year}'
-                          : 'Fecha no disponible',
+                      '${record.fecha.day}/${record.fecha.month}/${record.fecha.year}',
                       style: TextStyle(
                         fontSize: 13,
                         color: AppTheme.textSecondary,

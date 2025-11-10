@@ -1,8 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
+import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:vetcare_app/models/client_model.dart';
 import 'package:vetcare_app/models/pet_model.dart';
-import 'package:vetcare_app/services/api_service.dart';
+import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/services/client_service.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'create_user_screen.dart';
@@ -21,30 +23,49 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
+  bool _initialized = false;
 
   @override
   void initState() {
     super.initState();
-    _loadClients();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    if (!_initialized) {
+      _initialized = true;
+      _loadClients();
+    }
   }
 
   Future<void> _loadClients() async {
     setState(() => _isLoading = true);
     try {
-      final apiService = context.read<ApiService>();
-      final clientService = ClientService(apiService);
+      final auth = context.read<AuthProvider>();
+      final clientService = ClientService(auth.api);
       final clients = await clientService.getClients();
+      debugPrint('🖥️ Clientes cargados en UI: ${clients.length}');
+      for (var i = 0; i < clients.length; i++) {
+        debugPrint('   - Cliente ${i + 1}: ${clients[i].name} (${clients[i].pets.length} mascotas)');
+      }
       setState(() {
         _clients = clients;
         _filteredClients = clients;
         _isLoading = false;
       });
+      debugPrint('🖥️ Estado actualizado: _clients=${_clients.length}, _filteredClients=${_filteredClients.length}, _isLoading=$_isLoading');
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Error al cargar clientes: $e')),
-        );
+        // Programar el SnackBar para después del frame actual
+        SchedulerBinding.instance.addPostFrameCallback((_) {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Error al cargar clientes: $e')),
+            );
+          }
+        });
       }
     }
   }
@@ -90,8 +111,8 @@ class _ManageClientsScreenState extends State<ManageClientsScreen> {
 
     if (confirm == true) {
       try {
-        final apiService = context.read<ApiService>();
-        final clientService = ClientService(apiService);
+        final auth = context.read<AuthProvider>();
+        final clientService = ClientService(auth.api);
         await clientService.deleteClient(client.id);
         _loadClients();
         if (mounted) {
@@ -295,12 +316,13 @@ class _ClientCard extends StatelessWidget {
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
           child: Padding(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Container(
-                  width: 56,
-                  height: 56,
+                  width: 50,
+                  height: 50,
                   decoration: BoxDecoration(
                     color: AppTheme.primaryColor.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
@@ -309,28 +331,42 @@ class _ClientCard extends StatelessWidget {
                     child: Text(
                       client.name.substring(0, 1).toUpperCase(),
                       style: const TextStyle(
-                        fontSize: 24,
+                        fontSize: 22,
                         fontWeight: FontWeight.bold,
                         color: AppTheme.primaryColor,
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(width: 16),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text(client.name, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-                      const SizedBox(height: 4),
-                      if (client.phone != null)
+                      Text(
+                        client.name,
+                        style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      if (client.phone != null) ...[
+                        const SizedBox(height: 2),
                         Row(
                           children: [
                             Icon(Icons.phone, size: 14, color: isDark ? AppTheme.textSecondary : AppTheme.textLight),
                             const SizedBox(width: 4),
-                            Text(client.phone!, style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondary : AppTheme.textLight)),
+                            Flexible(
+                              child: Text(
+                                client.phone!,
+                                style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondary : AppTheme.textLight),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
                           ],
                         ),
+                      ],
                       const SizedBox(height: 2),
                       Row(
                         children: [
@@ -500,27 +536,63 @@ class _PetCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(color: isDark ? AppTheme.darkBackground : AppTheme.lightBackground, borderRadius: BorderRadius.circular(12), border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder)),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(color: AppTheme.secondaryColor.withValues(alpha: 0.1), borderRadius: BorderRadius.circular(8)),
-            child: Icon(pet.species.toLowerCase() == 'perro' ? Icons.pets : Icons.catching_pokemon, color: AppTheme.secondaryColor),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      decoration: BoxDecoration(
+        color: isDark ? AppTheme.darkBackground : AppTheme.lightBackground,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: isDark ? AppTheme.darkBorder : AppTheme.lightBorder),
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () {
+            debugPrint('🐾 Navegando al perfil de mascota: ${pet.name} (ID: ${pet.id})');
+            context.go('/pet-detail/${pet.id}');
+          },
+          borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(12),
+            child: Row(
               children: [
-                Text(pet.name, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                const SizedBox(height: 2),
-                Text('${pet.species} • ${pet.breed}', style: TextStyle(fontSize: 13, color: isDark ? AppTheme.textSecondary : AppTheme.textLight)),
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppTheme.secondaryColor.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    pet.species.toLowerCase() == 'perro' ? Icons.pets : Icons.catching_pokemon,
+                    color: AppTheme.secondaryColor,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        pet.name,
+                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15),
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '${pet.species} • ${pet.breed}',
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Icon(
+                  Icons.chevron_right,
+                  color: isDark ? AppTheme.textSecondary : AppTheme.textLight,
+                  size: 20,
+                ),
               ],
             ),
           ),
-        ],
+        ),
       ),
     );
   }
@@ -567,8 +639,8 @@ class _ClientFormScreenState extends State<_ClientFormScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final apiService = context.read<ApiService>();
-      final clientService = ClientService(apiService);
+      final auth = context.read<AuthProvider>();
+      final clientService = ClientService(auth.api);
 
       final data = {
         'nombre': _nameController.text.trim(),
@@ -600,7 +672,17 @@ class _ClientFormScreenState extends State<_ClientFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(widget.client == null ? 'Nuevo Cliente' : 'Editar Cliente')),
+      appBar: AppBar(
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () {
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          },
+        ),
+        title: Text(widget.client == null ? 'Nuevo Cliente' : 'Editar Cliente'),
+      ),
       body: Form(
         key: _formKey,
         child: ListView(

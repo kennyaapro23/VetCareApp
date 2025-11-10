@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:vetcare_app/providers/auth_provider.dart';
 import 'package:vetcare_app/services/appointment_service.dart';
-import 'package:vetcare_app/services/pet_service.dart';
 import 'package:vetcare_app/models/appointment_model.dart';
 import 'package:vetcare_app/theme/app_theme.dart';
 import 'package:intl/intl.dart';

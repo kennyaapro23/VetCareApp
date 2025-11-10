@@ -6,6 +6,7 @@ class AppointmentModel {
   final DateTime? date;
   final String? reason;
   final String? status;
+  final String? mascotaNombre;
 
   AppointmentModel({
     required this.id,
@@ -14,6 +15,7 @@ class AppointmentModel {
     this.date,
     this.reason,
     this.status,
+    this.mascotaNombre,
   });
 
   factory AppointmentModel.fromJson(dynamic json) {
@@ -85,6 +87,14 @@ class AppointmentModel {
       }
     }
 
+    // Extraer nombre de la mascota si existe
+    String? mascotaNombre;
+    if (map.containsKey('mascota') && map['mascota'] is Map && (map['mascota'] as Map).containsKey('nombre')) {
+      mascotaNombre = (map['mascota']['nombre'] ?? '').toString();
+    } else if (map.containsKey('pet') && map['pet'] is Map && (map['pet'] as Map).containsKey('nombre')) {
+      mascotaNombre = (map['pet']['nombre'] ?? '').toString();
+    }
+
     return AppointmentModel(
       id: (map['id'] ?? '').toString(),
       petId: petId,
@@ -92,6 +102,7 @@ class AppointmentModel {
       date: parsed,
       reason: (map['motivo'] ?? map['reason'])?.toString(),
       status: (map['estado'] ?? map['status'])?.toString(),
+      mascotaNombre: mascotaNombre,
     );
   }
 
@@ -102,6 +113,7 @@ class AppointmentModel {
         'fecha': date?.toIso8601String(),
         'motivo': reason,
         'estado': status,
+        'mascota_nombre': mascotaNombre,
       };
 }
 // ...existing code...

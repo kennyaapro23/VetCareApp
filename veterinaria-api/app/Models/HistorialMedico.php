@@ -27,6 +27,7 @@ class HistorialMedico extends Model
         'fecha' => 'datetime',
         'archivos_meta' => 'array',
         'facturado' => 'boolean',
+        'diagnostico' => 'array',
     ];
 
     public function mascota()

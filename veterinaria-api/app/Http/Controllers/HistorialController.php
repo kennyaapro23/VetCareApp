@@ -110,7 +110,9 @@ class HistorialController extends Controller
             'cita_id' => 'nullable|exists:citas,id',
             'fecha' => 'nullable|date',
             'tipo' => 'required|in:consulta,vacuna,procedimiento,control,otro',
-            'diagnostico' => 'nullable|string',
+            // diagnostico puede ser un string simple o un array de strings
+            'diagnostico' => 'nullable',
+            'diagnostico.*' => 'string',
             'tratamiento' => 'nullable|string',
             'observaciones' => 'nullable|string',
             // archivos removed: file upload not supported anymore
@@ -137,7 +139,10 @@ class HistorialController extends Controller
                 'cita_id' => $validated['cita_id'] ?? null,
                 'fecha' => $validated['fecha'] ?? now(),
                 'tipo' => $validated['tipo'],
-                'diagnostico' => $validated['diagnostico'] ?? null,
+                // Normalizar: si viene string, convertir a array con un elemento
+                'diagnostico' => isset($validated['diagnostico'])
+                    ? (is_array($validated['diagnostico']) ? $validated['diagnostico'] : [ (string) $validated['diagnostico'] ])
+                    : null,
                 'tratamiento' => $validated['tratamiento'] ?? null,
                 'observaciones' => $validated['observaciones'] ?? null,
                 'realizado_por' => $veterinario->id,
